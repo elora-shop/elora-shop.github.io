@@ -1,0 +1,16 @@
+{
+  "name": "ELORA — إكسسوارات مصنوعة يدويًا",
+  "short_name": "ELORA",
+  "description": "عقود وحقائب وأساور وأطقم مصنوعة يدويًا من اللؤلؤ والخرز والكريستال.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fbf8f6",
+  "theme_color": "#fbf8f6",
+  "icons": [
+    { "src": "assets/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/logo.png", "sizes": "1080x1080", "type": "image/png", "purpose": "any" }
+  ]
+}

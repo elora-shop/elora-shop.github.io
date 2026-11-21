@@ -1,112 +1,324 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ELORA — إكسسوارات مصنوعة يدويًا بحب</title>
+<meta name="description" content="ELORA متجر إكسسوارات مصنوعة يدويًا: عقود وحقائب وأساور وأطقم من اللؤلؤ والخرز والكريستال. اطلب بسهولة عبر واتساب.">
 <meta name="theme-color" content="#fbf8f6">
-<title>ELORA — إكسسوارات يدوية</title>
-<meta name="description" content="ELORA — إكسسوارات مصنوعة يدويًا. تصفّح التشكيلة واطلب مباشرة عبر واتساب.">
-
-<!-- بطاقة المشاركة على واتساب/فيسبوك -->
 <meta property="og:type" content="website">
-<meta property="og:title" content="ELORA — إكسسوارات يدوية">
-<meta property="og:description" content="تصفّح تشكيلة ELORA واطلب مباشرة عبر واتساب.">
+<meta property="og:title" content="ELORA — إكسسوارات مصنوعة يدويًا بحب">
+<meta property="og:description" content="عقود وحقائب وأساور وأطقم مصنوعة يدويًا من اللؤلؤ والخرز والكريستال.">
 <meta property="og:image" content="assets/og-image.png">
+<meta property="og:locale" content="ar_AR">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="assets/icon.png?v=20260813140531">
-<link rel="apple-touch-icon" href="assets/icon.png?v=20260813140531">
-
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.png">
+<link rel="apple-touch-icon" href="assets/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="assets/style.css?v=20260813140531">
+<link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script>
+  (function () {
+    var t; try { t = localStorage.getItem('elora:theme'); t = t && JSON.parse(t); } catch (e) {}
+    if (!t) t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = t;
+  })();
+</script>
+<link rel="stylesheet" href="assets/store.css?v=2.2.0">
 </head>
 <body>
-<script>
-  // يُلتقط قبل تحميل app.js ليشمل أخطاء قراءة الملف نفسها (متصفح قديم)
-  window.addEventListener('error', function () {
-    var el = document.getElementById('loadErr');
-    if (el) el.hidden = false;
-  }, true);
-</script>
 
-<header class="hero">
-  <button id="themeBtn" class="icon-btn theme-btn" title="تبديل الوضع" aria-label="تبديل الوضع الليلي">
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-      <circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/>
-    </svg>
-  </button>
+<!-- أيقونات -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></symbol>
+    <symbol id="i-bag" viewBox="0 0 24 24"><path d="M5 8h14l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="i-gift" viewBox="0 0 24 24"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7z"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></symbol>
+    <symbol id="i-gem" viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20M12 21 8 9l4-6 4 6z"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5z"/></symbol>
+    <symbol id="i-insta" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r=".6" fill="currentColor"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
+    <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/></symbol>
+    <symbol id="i-truck" viewBox="0 0 24 24"><path d="M1 5h13v11H1zM14 9h4l4 4v3h-8z"/><circle cx="5.5" cy="18.5" r="2"/><circle cx="17.5" cy="18.5" r="2"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+    <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M11 8v6M8 11h6"/></symbol>
+  </defs>
+</svg>
 
-  <div class="hero-inner">
-    <div id="logoSlot" class="logo-slot" hidden></div>
-    <h1 id="brandName">…</h1>
-    <p id="tagline" class="tagline"></p>
-    <div id="heroLinks" class="hero-links"></div>
+<a class="skip" href="#shop">تخطَّ إلى المنتجات</a>
+
+<div class="announce" id="announce" aria-live="polite"><span id="announceText">✦ ELORA</span></div>
+<div class="sample-banner" id="sampleBanner" hidden>
+  وضع المعاينة: الأسعار ورسوم التوصيل والكوبونات تجريبية. عدّلها في ملف <code dir="ltr">shop.json</code> ثم اجعل <code dir="ltr">"sampleData": false</code>
+</div>
+
+<header class="hdr" id="hdr">
+  <div class="wrap hdr-in">
+    <div class="hdr-side">
+      <button class="icon-btn only-m" id="menuBtn" aria-label="القائمة"><svg class="i"><use href="#i-menu"/></svg></button>
+      <nav class="hdr-nav" id="hdrNav" aria-label="الأقسام"></nav>
+    </div>
+    <a class="brand" href="#top" aria-label="ELORA الصفحة الرئيسية">
+      <span class="brand-word" id="brandName">ELORA</span>
+      <span class="brand-sub">Handmade Accessories</span>
+    </a>
+    <div class="hdr-actions">
+      <button class="icon-btn" id="searchBtn" aria-label="بحث"><svg class="i"><use href="#i-search"/></svg></button>
+      <button class="icon-btn" id="themeBtn" aria-label="تبديل الوضع الليلي"><svg class="i"><use href="#i-moon"/></svg></button>
+      <button class="icon-btn hide-m" data-open-drawer="wish" aria-label="المفضلة"><svg class="i"><use href="#i-heart"/></svg><span class="count" data-count="wish" hidden>0</span></button>
+      <button class="icon-btn cart-btn" data-open-drawer="cart" aria-label="السلة" id="cartBtn"><svg class="i"><use href="#i-bag"/></svg><span class="count" data-count="cart" hidden>0</span></button>
+    </div>
   </div>
 </header>
 
-<nav id="filters" class="filters" aria-label="تصنيفات"></nav>
+<main id="top">
+  <!-- الواجهة -->
+  <section class="hero">
+    <div class="wrap hero-in">
+      <div class="hero-copy">
+        <span class="eyebrow latin">Handmade with love</span>
+        <h1><span id="heroTitle">قطعٌ تُصنع يدويًا بحب</span><em id="heroAccent">لتكتمل بها أناقتك</em></h1>
+        <p class="hero-sub" id="heroSub">إكسسوارات مصنوعة يدويًا بحب</p>
+        <div class="hero-cta">
+          <a class="btn btn-lg" href="#shop">تسوّق المجموعة</a>
+          <a class="btn btn-lg btn-ghost" id="heroWa" target="_blank" rel="noopener">تواصل معنا</a>
+        </div>
+        <dl class="hero-stats">
+          <div><dt id="statCount">—</dt><dd>قطعة فريدة</dd></div>
+          <div><dt id="statCats">—</dt><dd>تشكيلات</dd></div>
+          <div><dt>١٠٠٪</dt><dd>صناعة يدوية</dd></div>
+        </dl>
+      </div>
+      <div class="hero-art" id="heroArt">
+        <div class="arch-frame" aria-hidden="true"></div>
+        <div class="arch skel" id="heroSlides" aria-hidden="true"></div>
+        <div class="hero-dots" id="heroDots" role="tablist" aria-label="الصور المميزة"></div>
+        <button class="hero-pick" id="heroPick" hidden></button>
+        <svg class="hero-seal" viewBox="0 0 120 120" aria-hidden="true">
+          <defs><path id="sealPath" d="M60 60m-46 0a46 46 0 1 1 92 0a46 46 0 1 1-92 0"/></defs>
+          <circle class="core" cx="60" cy="60" r="34"/>
+          <text><textPath href="#sealPath">Handmade · With Love · ELORA ·</textPath></text>
+          <path d="M60 46l3.2 9.3L72 58l-8.8 3.1L60 70l-3.2-8.9L48 58l8.8-2.7z" fill="currentColor"/>
+        </svg>
+      </div>
+    </div>
+  </section>
 
-<main>
-  <noscript>
-    <p class="empty">
-      لعرض المنتجات، فعّل JavaScript من إعدادات المتصفح.<br>
-      <span>أو تواصل معنا مباشرة عبر واتساب.</span>
-    </p>
-  </noscript>
-  <p id="loadErr" class="empty" hidden>
-    تعذّر عرض المنتجات على هذا المتصفح.<br>
-    <span>جرّب فتح الرابط من Google Chrome، أو حدّث متصفحك.</span>
-  </p>
-  <div id="grid" class="grid" aria-live="polite"></div>
-  <p id="emptyState" class="empty" hidden>
-    لا توجد منتجات بعد.<br>
-    <span>أضف صورك من لوحة التحكم، أو ضعها في مجلد <code>media</code> ثم شغّل <code>2-معاينة-المتجر.bat</code></span>
-  </p>
-  <div id="sentinel" class="sentinel"></div>
+  <div class="marquee" aria-hidden="true"><div class="marquee-track" id="marquee"></div></div>
+
+  <!-- الفئات -->
+  <section class="sec" id="cats">
+    <div class="wrap">
+      <div class="sec-head"><span class="kicker latin">The Collections</span><h2>تسوّق حسب الفئة</h2></div>
+      <div class="cat-row" id="catRow"></div>
+    </div>
+  </section>
+
+  <!-- المختارات -->
+  <section class="sec" id="picksSec">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="kicker latin">The Edit</span><h2>مختارات ELORA</h2>
+        <div class="rail-arrows">
+          <button class="icon-btn sm ring" data-rail="picksRail" data-dir="1" aria-label="السابق"><svg class="i"><use href="#i-prev"/></svg></button>
+          <button class="icon-btn sm ring" data-rail="picksRail" data-dir="-1" aria-label="التالي"><svg class="i"><use href="#i-next"/></svg></button>
+        </div>
+      </div>
+      <div class="rail" id="picksRail"></div>
+    </div>
+  </section>
+
+  <!-- الحكاية -->
+  <section class="story" id="story" hidden>
+    <div class="story-in">
+      <div class="story-media" id="storyMedia"></div>
+      <div class="story-copy">
+        <span class="kicker latin">Our Story</span>
+        <h2 id="storyTitle"></h2>
+        <p id="storyText"></p>
+        <a class="link-arrow" href="#shop">اكتشف المجموعة <svg class="i"><use href="#i-next"/></svg></a>
+        <span class="story-sign">Elora</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- المتجر -->
+  <section class="sec" id="shop">
+    <div class="wrap">
+      <div class="sec-head"><span class="kicker latin">The Boutique</span><h2>كل القطع</h2></div>
+      <div class="toolbar">
+        <div class="chips" id="chips" role="tablist" aria-label="تصفية حسب الفئة"></div>
+        <div class="tools">
+          <span class="result-count" id="resultCount"></span>
+          <label class="select">
+            <span class="sr">ترتيب حسب</span>
+            <select id="sortSel">
+              <option value="featured">المميّزة أولًا</option>
+              <option value="new">الأحدث</option>
+              <option value="price-asc">السعر: من الأقل</option>
+              <option value="price-desc">السعر: من الأعلى</option>
+              <option value="name">الاسم (أ - ي)</option>
+            </select>
+          </label>
+          <label class="switch"><input type="checkbox" id="inStockOnly"><span>المتوفر فقط</span></label>
+        </div>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div id="sentinel"></div>
+      <div class="empty" id="emptyState" hidden>
+        <svg class="i xl"><use href="#i-search"/></svg>
+        <p>لا توجد قطع مطابقة.</p>
+        <button class="btn btn-ghost" id="resetFilters">عرض كل القطع</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- شوهد مؤخرًا -->
+  <section class="sec" id="recentSec" hidden>
+    <div class="wrap">
+      <div class="sec-head"><span class="kicker latin">Recently Viewed</span><h2>شاهدتها مؤخرًا</h2></div>
+      <div class="rail small" id="recentRail"></div>
+    </div>
+  </section>
+
+  <!-- لماذا -->
+  <section class="sec why">
+    <div class="wrap">
+      <div class="sec-head"><span class="kicker latin">The ELORA Promise</span><h2>تفاصيل تُصنع لتدوم</h2></div>
+      <div class="why-grid" id="whyGrid"></div>
+    </div>
+  </section>
+
+  <section class="sec" id="testiSec" hidden>
+    <div class="wrap">
+      <div class="sec-head"><span class="kicker latin">Kind Words</span><h2>قالوا عن ELORA</h2></div>
+      <div class="testi-grid" id="testiGrid"></div>
+    </div>
+  </section>
+
+  <section class="sec" id="faqSec">
+    <div class="wrap narrow">
+      <div class="sec-head"><span class="kicker latin">Questions</span><h2>أسئلة شائعة</h2></div>
+      <div class="faq" id="faq"></div>
+    </div>
+  </section>
+
+  <section class="insta" id="instaSec" hidden>
+    <div class="wrap insta-in">
+        <span class="kicker latin">Follow the Story</span>
+        <h2>شاركنا إطلالتك مع ELORA</h2>
+        <p>تابعنا لتشاهد التشكيلات الجديدة أولًا، وكواليس صناعة كل قطعة.</p>
+      <a class="btn btn-lg" id="instaLink" target="_blank" rel="noopener"><svg class="i"><use href="#i-insta"/></svg> <span id="instaHandle"></span></a>
+    </div>
+  </section>
 </main>
 
-<footer class="footer">
-  <p id="footerBrand"></p>
-  <p class="count"><span id="totalCount">0</span> عنصر</p>
+<footer class="ftr">
+  <div class="wrap ftr-in">
+    <div class="ftr-brand">
+      <span class="brand-word lg" id="ftrBrand">ELORA</span>
+      <p id="ftrTag"></p>
+      <div class="ftr-social" id="ftrSocial"></div>
+    </div>
+    <div>
+      <h3>تسوّق</h3>
+      <ul id="ftrCats"></ul>
+    </div>
+    <div>
+      <h3>حسابي</h3>
+      <ul>
+        <li><button class="linklike" data-open-drawer="wish">المفضلة</button></li>
+        <li><button class="linklike" data-open-drawer="orders">طلباتي</button></li>
+        <li><button class="linklike" data-open-drawer="cart">السلة</button></li>
+        <li><button class="linklike" id="installBtn" hidden>ثبّت التطبيق على جوالك</button></li>
+      </ul>
+    </div>
+  </div>
+  <div class="wrap ftr-bottom"><span id="copyright"></span><span class="latin">Handmade with love</span></div>
 </footer>
 
-<!-- زر واتساب عائم -->
-<a id="waFab" class="wa-fab" hidden target="_blank" rel="noopener" aria-label="تواصل عبر واتساب">
-  <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true">
-    <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 004.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm5.8 14.06c-.25.69-1.44 1.32-1.98 1.36-.53.05-1.02.24-3.44-.72-2.9-1.14-4.74-4.1-4.88-4.29-.14-.19-1.17-1.55-1.17-2.96s.74-2.1 1-2.39c.25-.29.55-.36.73-.36.19 0 .37 0 .53.01.17.01.4-.06.63.48.24.58.8 1.99.87 2.13.07.14.12.31.02.5-.09.19-.14.31-.28.48-.14.17-.3.37-.42.5-.14.14-.29.29-.12.57.16.29.73 1.2 1.56 1.94 1.07.95 1.98 1.25 2.26 1.39.28.14.45.12.61-.07.17-.19.71-.83.9-1.11.19-.29.38-.24.63-.14.25.09 1.61.76 1.88.9.28.14.46.21.53.33.07.12.07.69-.18 1.38z"/>
-  </svg>
-</a>
+<nav class="bnav" aria-label="تنقل سريع">
+  <a href="#top"><svg class="i"><use href="#i-home"/></svg><span>الرئيسية</span></a>
+  <a href="#cats"><svg class="i"><use href="#i-grid"/></svg><span>الفئات</span></a>
+  <button id="bnSearch"><svg class="i"><use href="#i-search"/></svg><span>بحث</span></button>
+  <button data-open-drawer="wish"><svg class="i"><use href="#i-heart"/></svg><span>المفضلة</span><b class="count" data-count="wish" hidden>0</b></button>
+  <button data-open-drawer="cart"><svg class="i"><use href="#i-bag"/></svg><span>السلة</span><b class="count" data-count="cart" hidden>0</b></button>
+</nav>
 
-<!-- العارض -->
-<div id="lightbox" class="lightbox" hidden role="dialog" aria-modal="true" aria-label="عارض الصور">
-  <button class="icon-btn lb-close" id="lbClose" aria-label="إغلاق">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-  </button>
-  <button class="icon-btn lb-nav lb-prev" id="lbPrev" aria-label="السابق">
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
-  </button>
-  <button class="icon-btn lb-nav lb-next" id="lbNext" aria-label="التالي">
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
-  </button>
+<a class="wa-fab" id="waFab" target="_blank" rel="noopener" aria-label="راسلنا على واتساب" hidden><svg class="i"><use href="#i-chat"/></svg></a>
 
-  <figure class="lb-stage" id="lbStage"></figure>
+<div class="scrim" id="scrim" hidden></div>
 
-  <div class="lb-bar">
-    <div class="lb-meta">
-      <strong id="lbTitle"></strong>
-      <span id="lbCat"></span>
+<!-- الدرج الجانبي: السلة / المفضلة / الطلبات -->
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" hidden>
+  <div class="drawer-head">
+    <h2 id="drawerTitle"></h2>
+    <button class="icon-btn" data-close aria-label="إغلاق"><svg class="i"><use href="#i-close"/></svg></button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+  <div class="drawer-foot" id="drawerFoot"></div>
+</aside>
+
+<!-- قائمة الجوال -->
+<aside class="drawer start" id="menu" role="dialog" aria-modal="true" aria-label="القائمة" hidden>
+  <div class="drawer-head">
+    <span class="brand-word">ELORA</span>
+    <button class="icon-btn" data-close aria-label="إغلاق"><svg class="i"><use href="#i-close"/></svg></button>
+  </div>
+  <div class="drawer-body">
+    <div class="menu-label">الأقسام</div>
+    <ul class="menu-list" id="menuCats"></ul>
+    <div class="menu-label">حسابي</div>
+    <ul class="menu-list">
+      <li><button data-open-drawer="wish"><svg class="i"><use href="#i-heart"/></svg> المفضلة</button></li>
+      <li><button data-open-drawer="orders"><svg class="i"><use href="#i-receipt"/></svg> طلباتي</button></li>
+      <li><a id="menuInsta" target="_blank" rel="noopener" hidden><svg class="i"><use href="#i-insta"/></svg> إنستقرام</a></li>
+      <li><a id="menuWa" target="_blank" rel="noopener" hidden><svg class="i"><use href="#i-chat"/></svg> واتساب</a></li>
+      <li><button id="themeBtnM"><svg class="i"><use href="#i-moon"/></svg> <span>الوضع الليلي</span></button></li>
+    </ul>
+  </div>
+</aside>
+
+<!-- صفحة المنتج -->
+<div class="modal" id="sheet" role="dialog" aria-modal="true" aria-label="تفاصيل القطعة" hidden>
+  <div class="modal-card sheet-card" id="sheetCard"></div>
+</div>
+
+<!-- إتمام الطلب -->
+<div class="modal" id="checkout" role="dialog" aria-modal="true" aria-label="إتمام الطلب" hidden>
+  <div class="modal-card co-card" id="coCard"></div>
+</div>
+
+<!-- البحث -->
+<div class="search-ov" id="searchOv" role="dialog" aria-modal="true" aria-label="بحث" hidden>
+  <div class="search-panel">
+    <div class="search-field">
+      <svg class="i"><use href="#i-search"/></svg>
+      <input id="searchInput" type="search" placeholder="ابحث: عقد لؤلؤ، حقيبة، سوار…" autocomplete="off">
+      <button class="icon-btn sm" data-close aria-label="إغلاق"><svg class="i"><use href="#i-close"/></svg></button>
     </div>
-    <div class="lb-actions">
-      <a id="lbWa" class="btn btn-wa" target="_blank" rel="noopener" hidden>اطلب عبر واتساب</a>
-      <button id="lbShare" class="btn btn-ghost" type="button">مشاركة</button>
-    </div>
+    <div class="search-results" id="searchResults"></div>
   </div>
 </div>
 
-<div id="toast" class="toast" hidden></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="assets/app.js?v=20260813140531"></script>
+<script src="assets/store.js?v=2.2.1" defer></script>
 </body>
 </html>
