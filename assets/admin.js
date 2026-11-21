@@ -487,7 +487,8 @@
       const it = { path, sha: null, id: makeId(path.slice(6)), title: name, category: cat, type: q.kind, thumbPath, thumbSha: null, pending: true };
       added.push(it);
       const pr = toNum(q.price);
-      if (pr != null) setP(it, { price: pr });
+      // تاريخ الإضافة: منه تظهر شارة «جديد» ويُرتّب «الأحدث» أيًّا كانت الاستضافة
+      setP(it, { added: new Date().toISOString().slice(0, 19), ...(pr != null ? { price: pr } : {}) }, true);
     }
     closeSheet('review');
     try {

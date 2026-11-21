@@ -219,20 +219,46 @@ def git_added_dates():
     return dates
 
 
-def added_time(path: Path, rel: Path, dates: dict) -> float:
-    iso = dates.get("media/" + rel.as_posix())
-    if iso:
-        try:
-            return datetime.fromisoformat(iso).timestamp()
-        except ValueError:
-            pass
-    return path.stat().st_mtime        # ملف لم يُحفظ في git بعد (معاينة محلية)
+DATES_FILE = ROOT / "tools" / "added-dates.json"
+
+
+def load_known_dates() -> dict:
+    """مصادر التاريخ التي لا تعتمد على الاستضافة:
+    ١) tools/added-dates.json  (لقطة ثابتة لتواريخ القطع القديمة)
+    ٢) shop.json → products[الاسم].added  (تسجّله لوحة التحكم لحظة رفع القطعة)
+    """
+    known = {}
+    try:
+        known.update(json.loads(DATES_FILE.read_text(encoding="utf-8")))
+    except Exception:
+        pass
+    by_title = {}
+    try:
+        shop = json.loads((ROOT / "shop.json").read_text(encoding="utf-8"))
+        for title, p in (shop.get("products") or {}).items():
+            if isinstance(p, dict) and p.get("added"):
+                by_title[title] = p["added"]
+    except Exception:
+        pass
+    return known, by_title
+
+
+def added_time(path: Path, rel: Path, dates: dict, known=None, by_title=None) -> float:
+    key = "media/" + rel.as_posix()
+    for iso in (dates.get(key), (known or {}).get(key), (by_title or {}).get(path.stem.strip())):
+        if iso:
+            try:
+                return datetime.fromisoformat(iso).timestamp()
+            except ValueError:
+                pass
+    return path.stat().st_mtime        # لا مصدر معروف (معاينة محلية لملف جديد)
 
 
 # ------------------------------------------------------------------ الفحص
 def scan():
     items, skipped = [], 0
     dates = git_added_dates()
+    known, by_title = load_known_dates()
 
     for path in sorted(MEDIA.rglob("*")):
         if not path.is_file():
@@ -251,7 +277,7 @@ def scan():
             continue
 
         category = rel.parts[0] if len(rel.parts) > 1 else DEFAULT_CAT
-        mtime = added_time(path, rel, dates)
+        mtime = added_time(path, rel, dates, known, by_title)
 
         if kind == "image":
             w, h = get_dims(path)
