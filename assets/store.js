@@ -101,7 +101,9 @@
   function waLink(text) {
     const n = String(CFG.whatsapp || '').replace(/\D/g, '');
     if (!n) return null;
-    return `https://wa.me/${n}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
+    // الرموز التعبيرية الملوّنة (مثل 🌸) تظهر «�» في بعض نسخ واتساب عند فتحها من رابط
+    const safe = String(text || '').replace(/\u{1F338}/gu, '✿').replace(/[\u{10000}-\u{10FFFF}]️?/gu, '').replace(/[ \t]{2,}/g, ' ');
+    return `https://wa.me/${n}${safe ? `?text=${encodeURIComponent(safe)}` : ''}`;
   }
 
   /* ================= واجهات العرض ================= */
@@ -170,7 +172,7 @@
     $('#copyright').textContent = `© ${num(new Date().getFullYear()).replace(/٬/g, '')} ${name} — جميع الحقوق محفوظة`;
     $('#sampleBanner').hidden = !SHOP.sampleData;
 
-    const wa = waLink('السلام عليكم ورحمة الله 🌸');
+    const wa = waLink('السلام عليكم ورحمة الله ✿');
     const insta = CFG.instagram ? `https://instagram.com/${String(CFG.instagram).replace(/^@/, '')}` : '';
     if (wa) {
       $('#waFab').href = wa; $('#waFab').hidden = false;
