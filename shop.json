@@ -4,7 +4,7 @@
   "sampleData": false,
 
   "_orderEndpoint": "رابط استقبال الطلبات من جدول Google (راجع setup/ربط-الطلبات.md). إن تُرك فارغًا تُرسل الطلبات عبر واتساب فقط.",
-  "orderEndpoint": "",
+  "orderEndpoint": "https://script.google.com/macros/s/AKfycbyBJIefAXGNpkrEUQtf6ctQXGJPcOTJF6F1Xy072sX1rSXEP-CQvf_GSbqDhpBlACLcZQ/exec",
 
   "currency": "ر.ي",
   "digits": "arab",

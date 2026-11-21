@@ -14,6 +14,8 @@ const NOTIFY_EMAIL = '';            // اتركه فارغًا ليصل التن
 const STORE_NAME   = 'ELORA';
 const SHEET_NAME   = 'الطلبات';
 const STATUSES     = ['جديد', 'تم التأكيد', 'قيد التجهيز', 'تم الشحن', 'تم التسليم', 'ملغي'];
+// معرّف الجدول: الجزء بين /d/ و /edit في رابطه. يلزم فقط إن أنشأت المشروع من script.google.com بدل قائمة «Extensions» في الجدول.
+const SPREADSHEET_ID = '';
 // ===============================================
 
 const HEADERS = [
@@ -54,7 +56,8 @@ function setup() {
   ['المجموع', 'الخصم', 'التوصيل', 'تغليف هدية', 'الإجمالي'].forEach((h) =>
     sh.getRange(2, COL[h], sh.getMaxRows() - 1, 1).setNumberFormat('#,##0'));
   sh.getRange(2, COL['القطع'], sh.getMaxRows() - 1, 1).setWrap(true);
-  SpreadsheetApp.getActive().toast('تم تجهيز جدول الطلبات ✓', STORE_NAME, 5);
+  try { ss_().toast('تم تجهيز جدول الطلبات ✓', STORE_NAME, 5); } catch (e) { /* التنبيه يظهر فقط داخل نافذة الجدول */ }
+  Logger.log('تم تجهيز جدول الطلبات ✓ ' + ss_().getUrl());
 }
 
 /** يستقبل الطلب من المتجر */
@@ -133,8 +136,14 @@ function doGet(e) {
 }
 
 // ================== أدوات ==================
+function ss_() {
+  const active = SpreadsheetApp.getActive();
+  if (active) return active;
+  if (!SPREADSHEET_ID) throw new Error('ضع معرّف الجدول في SPREADSHEET_ID أعلى الكود');
+  return SpreadsheetApp.openById(SPREADSHEET_ID);
+}
 function sheet_() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = ss_();
   return ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME, 0);
 }
 function findRow_(sh, id) {
@@ -190,7 +199,7 @@ function notify_(d, items, count) {
           ${row('ملاحظات', esc(d.notes))}
         </table>
         ${wa ? `<a href="${wa}" style="display:block;text-align:center;background:#25d366;color:#fff;text-decoration:none;padding:13px;border-radius:6px;margin-top:20px;font-weight:bold">مراسلة الزبون على واتساب</a>` : ''}
-        <a href="${SpreadsheetApp.getActive().getUrl()}" style="display:block;text-align:center;border:1px solid #241c19;color:#241c19;text-decoration:none;padding:12px;border-radius:6px;margin-top:10px">فتح جدول الطلبات</a>
+        <a href="${ss_().getUrl()}" style="display:block;text-align:center;border:1px solid #241c19;color:#241c19;text-decoration:none;padding:12px;border-radius:6px;margin-top:10px">فتح جدول الطلبات</a>
       </div>
     </div>
   </div>`;
