@@ -181,9 +181,15 @@
     SHOP.products ||= {};
     SHOP.coupons ||= {};
     NF = new Intl.NumberFormat(SHOP.digits === 'latn' ? 'en' : 'ar-u-nu-arab');
+    snapshot();
     changes.clear();
     updateSavebar();
   }
+  // نسخة من آخر حالة منشورة: نقارن بها قبل الحفظ حتى لا تُنشر حفظات فارغة
+  let ORIG_SHOP = '', ORIG_SITE = '';
+  // مقارنة لا تتأثر بترتيب المفاتيح (إعادة إدراج مفتاح تغيّر ترتيبه دون أن يتغيّر المحتوى)
+  const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x)) ? Object.keys(x).sort().reduce((o, key) => (o[key] = x[key], o), {}) : x);
+  function snapshot() { ORIG_SHOP = canon(cleanShop()); ORIG_SITE = canon(SITE); }
 
   /* ═══════════ بيانات المنتجات في shop.json ═══════════ */
   const getP = (it) => (SHOP.products[it.title] || SHOP.products[it.id] || {});
@@ -221,8 +227,16 @@
     return s;
   }
   async function saveAll(extra = [], message) {
-    const entries = [...extra, { path: SHOP_PATH, blob: jsonBlob(cleanShop()) }];
-    if (changes.has('site') || stagedLogo) {
+    const shopNow = canon(cleanShop());
+    const siteChanged = canon(SITE) !== ORIG_SITE || !!stagedLogo;
+    if (!extra.length && shopNow === ORIG_SHOP && !siteChanged) {
+      changes.clear();
+      updateSavebar();
+      return false;                      // لا شيء تغيّر فعلًا (مثلًا: تعديل ثم إرجاعه)
+    }
+    const entries = [...extra];
+    if (shopNow !== ORIG_SHOP) entries.push({ path: SHOP_PATH, blob: jsonBlob(cleanShop()) });
+    if (siteChanged) {
       const next = { ...SITE };
       if (stagedLogo) { entries.push({ path: 'assets/logo.png', blob: stagedLogo.logo }, { path: 'assets/icon.png', blob: stagedLogo.icon }); next.logo = 'assets/logo.png'; }
       entries.push({ path: CFG_PATH, blob: jsonBlob(next) });
@@ -232,8 +246,10 @@
     await commit(entries, msg, (d, t) => t > 1 && busy(`جارٍ الرفع… ${num(d)}/${num(t)}`));
     changes.clear();
     if (stagedLogo) { URL.revokeObjectURL(stagedLogo.url); stagedLogo = null; }
+    snapshot();
     updateSavebar();
     showBanner();
+    return true;
   }
   function summarize(kinds) {
     const m = { p: 'الأسعار والمنتجات', c: 'الكوبونات', promo: 'شريط العرض', ship: 'التوصيل والدفع', front: 'واجهة المتجر', orders: 'إعدادات الطلبات', site: 'إعدادات المتجر' };
@@ -250,7 +266,7 @@
   }
 
   $('#sbSave').addEventListener('click', async () => {
-    try { busy('جارٍ الحفظ والنشر…'); await saveAll(); toast('تم الحفظ والنشر'); render(); }
+    try { busy('جارٍ الحفظ والنشر…'); toast(await saveAll() ? 'تم الحفظ والنشر' : 'لا توجد تغييرات فعلية لحفظها'); render(); }
     catch (e) { toast('تعذّر الحفظ: ' + e.message, true); }
     finally { idle(); }
   });
@@ -545,6 +561,9 @@
       if (it.thumbPath && it.thumbSha) { newThumb = `media/_thumbs/${cat}/${name}.${ext(it.thumbPath)}`; entries.push({ path: it.thumbPath, sha: null }, { path: newThumb, sha: it.thumbSha }); }
       Object.assign(it, { path: newPath, id: makeId(newPath.slice(6)), title: name, category: cat, thumbPath: newThumb, pending: true });
       renameP(oldTitle, oldId, it);
+      // الرابط القديم للقطعة (المنشور في إنستقرام مثلًا) يبقى يفتحها بعد تغيير الاسم
+      const e = (SHOP.products[it.title] ||= {});
+      e.aliases = [...new Set([...(e.aliases || []), shortId(oldId)])].filter((a) => a !== shortId(it.id));
     }
     setP(it, { price, oldPrice: old, stock: toNum($('#isStock').value), from: $('#isFrom').checked, desc: $('#isDesc').value.trim(), featured: $('#isFeat').checked, hidden: $('#isHidden').checked });
     closeSheet('itemSheet');

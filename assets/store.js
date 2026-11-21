@@ -15,7 +15,8 @@
   const icon = (n, cls = '') => `<svg class="i ${cls}"><use href="#i-${n}"/></svg>`;
   const norm = (s) => String(s || '').toLowerCase()
     .replace(/[ً-ْـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي')
-    .replace(/ؤ/g, 'و').replace(/ئ/g, 'ي').replace(/\s+/g, ' ').trim();
+    .replace(/ؤ/g, 'و').replace(/ئ/g, 'ي').replace(/\s+/g, ' ').trim()
+    .replace(/لولو/g, 'لول');   // «لؤلؤ» و«لولو» و«لول» كلها تجد بعضها
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const store = {
@@ -74,6 +75,7 @@
           oldPrice: Number.isFinite(extra.oldPrice) ? extra.oldPrice : null,
           stock: Number.isFinite(extra.stock) ? extra.stock : null,
           desc: extra.desc || '', featured: !!extra.featured, hidden: !!extra.hidden, from: !!extra.from,
+          aliases: Array.isArray(extra.aliases) ? extra.aliases : [],
         };
         p.key = norm(`${p.title} ${p.cat} ${p.desc}`);
         return p;
@@ -81,10 +83,19 @@
       .filter((p) => !p.hidden);
     BY.clear(); BYSID.clear();
     ITEMS.forEach((p) => { p.sid = shortId(p.id); BY.set(p.id, p); BYSID.set(p.sid, p); });
+    // روابط قديمة لقطع أُعيدت تسميتها تبقى تفتحها
+    ITEMS.forEach((p) => p.aliases.forEach((a) => { if (!BYSID.has(a)) BYSID.set(a, p); }));
     // نظّف السلة والمفضلة من قطع لم تعد موجودة
     for (const id in S.cart) if (!BY.has(id)) delete S.cart[id];
     S.wish = S.wish.filter((id) => BY.has(id));
     S.recent = S.recent.filter((id) => BY.has(id));
+  }
+
+  /** يختار المتصفح الصورة المناسبة لحجم الشاشة: المصغّرة (≈٧٠٠ بكسل) للجوال، والكاملة للشاشات الكبيرة. */
+  function srcset(p, sizes) {
+    if (!p.w || !p.h || p.thumb === p.img) return `src="${esc(p.img)}"`;
+    const tw = Math.round(p.w * Math.min(1, 700 / Math.max(p.w, p.h)));
+    return `src="${esc(p.thumb)}" srcset="${esc(p.thumb)} ${tw}w, ${esc(p.img)} ${p.w}w" sizes="${sizes}"`;
   }
 
   const isNew = (p) => p.added && Date.now() - p.added < (SHOP.newDays || 14) * 864e5;
@@ -260,7 +271,7 @@
       const pic = ITEMS.find((p) => p.title === story.image) || featured[1] || ITEMS[0];
       $('#storyTitle').textContent = story.title;
       $('#storyText').textContent = story.text;
-      $('#storyMedia').innerHTML = `<img src="${esc(pic.img)}" alt="${esc(pic.title)}" loading="lazy">`;
+      $('#storyMedia').innerHTML = `<img ${srcset(pic, '(max-width: 820px) 100vw, 50vw')} alt="${esc(pic.title)}" loading="lazy">`;
       $('#story').hidden = false;
     }
 
@@ -312,14 +323,15 @@
     const box = $('#heroSlides'), dots = $('#heroDots'), pick = $('#heroPick');
     if (!pool.length) return;
     box.classList.remove('skel');
-    box.innerHTML = pool.map((p, i) => `<img src="${esc(p.img)}" alt="" ${i ? 'loading="lazy"' : 'fetchpriority="high"'} style="background:url('${esc(p.thumb)}') center/cover">`).join('');
-    dots.innerHTML = pool.length > 1 ? pool.map((p, i) => `<button role="tab" aria-label="${esc(p.title)}" data-slide="${i}"></button>`).join('') : '';
-    let cur = -1;
+    box.innerHTML = pool.map((p, i) => `<img ${srcset(p, '(max-width: 820px) 82vw, 36vw')} alt="" ${i ? 'loading="lazy"' : 'fetchpriority="high"'} style="background:url('${esc(p.thumb)}') center/cover">`).join('');
+    dots.innerHTML = pool.length > 1 ? pool.map((p, i) => `<button role="tab" aria-label="${esc(p.title)}" data-slide="${i}"></button>`).join('')
+      + '<button class="hero-pause" data-pause aria-label="إيقاف العرض المتحرك" aria-pressed="false"></button>' : '';
+    let cur = -1, paused = false, hover = false;
     const show = (i) => {
       cur = (i + pool.length) % pool.length;
       const p = pool[cur];
       $$('img', box).forEach((im, k) => im.classList.toggle('on', k === cur));
-      $$('button', dots).forEach((d, k) => d.setAttribute('aria-current', String(k === cur)));
+      $$('[data-slide]', dots).forEach((d, k) => d.setAttribute('aria-current', String(k === cur)));
       pick.hidden = false;
       pick.dataset.open = p.id;
       pick.innerHTML = `<img src="${esc(p.thumb)}" alt=""><span><small>قطعة مختارة</small><b>${esc(p.title)}</b>${priceHTML(p)}</span>${icon('next')}`;
@@ -328,9 +340,23 @@
     // تبديل الصورة ليس حركة مزعجة، والتأثيرات الحركية نفسها تُلغى عبر CSS في ذلك الوضع.
     const play = () => {
       clearInterval(heroTimer);
-      if (pool.length > 1) heroTimer = setInterval(() => { if (!document.hidden) show(cur + 1); }, reduced ? 6000 : 5000);
+      if (pool.length > 1 && !paused) heroTimer = setInterval(() => { if (!document.hidden && !hover) show(cur + 1); }, reduced ? 6000 : 5000);
     };
-    dots.onclick = (e) => { const b = e.target.closest('[data-slide]'); if (b) { show(Number(b.dataset.slide)); play(); } };
+    dots.onclick = (e) => {
+      const pz = e.target.closest('[data-pause]');
+      if (pz) {
+        paused = !paused;
+        pz.setAttribute('aria-pressed', String(paused));
+        pz.setAttribute('aria-label', paused ? 'تشغيل العرض المتحرك' : 'إيقاف العرض المتحرك');
+        play();
+        return;
+      }
+      const b = e.target.closest('[data-slide]');
+      if (b) { show(Number(b.dataset.slide)); play(); }
+    };
+    // يتوقف مؤقتًا ما دام مؤشر الفأرة فوق الصورة
+    $('#heroArt').addEventListener('mouseenter', () => { hover = true; });
+    $('#heroArt').addEventListener('mouseleave', () => { hover = false; });
     // السحب بالإصبع للتنقل بين الصور
     let sx = null, sy = null;
     box.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
@@ -689,7 +715,7 @@
       <button class="icon-btn modal-close" data-close aria-label="إغلاق">${icon('close')}</button>
       <div class="sheet">
         <div class="sheet-media" id="zoomBox">
-          <img src="${esc(p.img)}" alt="${esc(p.title)}" style="background:url('${esc(p.thumb)}') center/cover">
+          <img ${srcset(p, '(max-width: 820px) 100vw, 1100px')} alt="${esc(p.title)}" style="background:url('${esc(p.thumb)}') center/cover">
           ${idx > -1 && list.length > 1 ? `
             <button class="icon-btn sheet-nav prev" data-step="-1" aria-label="القطعة السابقة">${icon('prev')}</button>
             <button class="icon-btn sheet-nav next" data-step="1" aria-label="القطعة التالية">${icon('next')}</button>` : ''}
@@ -1366,11 +1392,19 @@
   }
 
   /* ================= الترويسة عند التمرير ================= */
-  let ticking = false;
+  let ticking = false, lastY = 0;
   addEventListener('scroll', () => {
     if (ticking) return;
     ticking = true;
-    requestAnimationFrame(() => { $('#hdr').classList.toggle('scrolled', scrollY > 8); ticking = false; });
+    requestAnimationFrame(() => {
+      $('#hdr').classList.toggle('scrolled', scrollY > 8);
+      // على الجوال: زر واتساب يختفي أثناء النزول (لا يغطي الأسعار) ويعود عند الصعود
+      const fab = $('#waFab');
+      if (innerWidth <= 820) fab.classList.toggle('away', scrollY > lastY && scrollY > 400);
+      else fab.classList.remove('away');
+      lastY = scrollY;
+      ticking = false;
+    });
   }, { passive: true });
 
   /* ================= روابط القطع ================= */

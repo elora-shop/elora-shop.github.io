@@ -18,7 +18,7 @@
     document.documentElement.dataset.theme = t;
   })();
 </script>
-<link rel="stylesheet" href="assets/admin.css">
+<link rel="stylesheet" href="assets/admin.css?v=dev2">
 </head>
 <body class="adm">
 
@@ -258,12 +258,12 @@
       <div class="grid2">
         <div class="card">
           <div class="card-h"><h3>توصيل مجاني</h3></div>
-          <label class="fld"><span>عندما يتجاوز الطلب</span><span class="inp money"><input id="freeOver" type="number" min="0" step="100" placeholder="0 = إيقاف"><em class="cur"></em></span></label>
+          <label class="fld"><span>عندما يتجاوز الطلب</span><span class="inp money"><input id="freeOver" type="text" inputmode="numeric" placeholder="0 = إيقاف"><em class="cur"></em></span></label>
           <p class="hint">يظهر للزبون شريط «أضف … لتحصل على توصيل مجاني».</p>
         </div>
         <div class="card">
           <div class="card-h"><h3><svg class="i"><use href="#i-gift"/></svg> تغليف هدية</h3><label class="toggle"><input type="checkbox" id="giftOn"><span></span></label></div>
-          <label class="fld"><span>رسوم التغليف</span><span class="inp money"><input id="giftFee" type="number" min="0" step="100" placeholder="0 = مجاني"><em class="cur"></em></span></label>
+          <label class="fld"><span>رسوم التغليف</span><span class="inp money"><input id="giftFee" type="text" inputmode="numeric" placeholder="0 = مجاني"><em class="cur"></em></span></label>
           <p class="hint">يستطيع الزبون إضافة رسالة إهداء مع الطلب.</p>
         </div>
       </div>
@@ -405,11 +405,11 @@
         <label class="fld"><span>اسم المنتج</span><input id="isTitle" type="text"></label>
         <label class="fld"><span>التصنيف</span><select id="isCat"></select></label>
         <div class="row2">
-          <label class="fld"><span>السعر</span><span class="inp money"><input id="isPrice" type="number" min="0" step="100" placeholder="عند الطلب"><em class="cur"></em></span></label>
-          <label class="fld"><span>قبل الخصم <small>(اختياري)</small></span><span class="inp money"><input id="isOld" type="number" min="0" step="100"><em class="cur"></em></span></label>
+          <label class="fld"><span>السعر</span><span class="inp money"><input id="isPrice" type="text" inputmode="numeric" placeholder="عند الطلب"><em class="cur"></em></span></label>
+          <label class="fld"><span>قبل الخصم <small>(اختياري)</small></span><span class="inp money"><input id="isOld" type="text" inputmode="numeric"><em class="cur"></em></span></label>
         </div>
         <div class="row2">
-          <label class="fld"><span>المخزون <small>(فارغ = مفتوح)</small></span><input id="isStock" type="number" min="0" step="1" placeholder="∞"></label>
+          <label class="fld"><span>المخزون <small>(فارغ = مفتوح)</small></span><input id="isStock" type="text" inputmode="numeric" placeholder="∞"></label>
           <div class="fld"><span>السعر يبدأ من</span><label class="toggle-row"><input type="checkbox" id="isFrom"><i></i><small>يظهر «يبدأ من …»</small></label></div>
         </div>
         <label class="fld"><span>الوصف <small>(اختياري)</small></span><textarea id="isDesc" rows="3" maxlength="300" placeholder="قطعة مصنوعة يدويًا…"></textarea></label>
@@ -442,7 +442,7 @@
         </div>
       </div>
       <div class="row2">
-        <label class="fld" id="bkValWrap"><span id="bkValLbl">النسبة ٪</span><input id="bkVal" type="number" step="1"></label>
+        <label class="fld" id="bkValWrap"><span id="bkValLbl">النسبة ٪</span><input id="bkVal" type="text" inputmode="numeric"></label>
         <label class="fld"><span>التقريب</span><select id="bkRound"><option value="1">بدون</option><option value="50">لأقرب ٥٠</option><option value="100" selected>لأقرب ١٠٠</option><option value="500">لأقرب ٥٠٠</option></select></label>
       </div>
       <p class="bk-prev" id="bkPrev"></p>
@@ -461,8 +461,8 @@
         <div class="seg" id="cpType"><button type="button" data-v="percent" aria-pressed="true">نسبة ٪</button><button type="button" data-v="fixed" aria-pressed="false">مبلغ ثابت</button></div>
       </div>
       <div class="row2">
-        <label class="fld"><span id="cpValLbl">النسبة ٪</span><input id="cpVal" type="number" min="1" step="1"></label>
-        <label class="fld"><span>حد أدنى للطلب</span><span class="inp money"><input id="cpMin" type="number" min="0" step="100" placeholder="0"><em class="cur"></em></span></label>
+        <label class="fld"><span id="cpValLbl">النسبة ٪</span><input id="cpVal" type="text" inputmode="numeric"></label>
+        <label class="fld"><span>حد أدنى للطلب</span><span class="inp money"><input id="cpMin" type="text" inputmode="numeric" placeholder="0"><em class="cur"></em></span></label>
       </div>
       <div class="row2">
         <label class="fld"><span>ينتهي في <small>(اختياري)</small></span><input id="cpExp" type="date"></label>
@@ -481,6 +481,6 @@
 <div class="busy" id="busy" hidden><div class="spinner"></div><p id="busyMsg">جارٍ العمل…</p></div>
 <div class="toasts" id="toasts"></div>
 
-<script src="assets/admin.js"></script>
+<script src="assets/admin.js?v=dev2"></script>
 </body>
 </html>

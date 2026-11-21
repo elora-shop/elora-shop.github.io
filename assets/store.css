@@ -180,6 +180,12 @@ h1, h2, h3 { font-family: var(--f-head); font-weight: 400; line-height: 1.35; ma
 .hero-dots { position: absolute; left: 4%; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 2; }
 .hero-dots button { position: relative; width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--text); opacity: .45; transition: all .3s; }
 .hero-dots button::after { content: ""; position: absolute; inset: -9px; }
+.hero-dots .hero-pause { width: 14px; height: 14px; border: 0; border-radius: 0; opacity: .55; margin-top: 4px;
+  background: linear-gradient(90deg, var(--text) 0 35%, transparent 35% 65%, var(--text) 65%) center / 9px 11px no-repeat; }
+.hero-dots .hero-pause[aria-pressed="true"] { background: none; border-style: solid; border-width: 6px 0 6px 10px; border-color: transparent transparent transparent var(--text); width: 0; height: 0; }
+.hero-dots .hero-pause:hover { opacity: 1; }
+.wa-fab { transition: transform .35s var(--ease), opacity .3s; }
+.wa-fab.away { transform: translateY(140%); opacity: 0; pointer-events: none; }
 .hero-dots button[aria-current="true"] { background: var(--text); opacity: 1; height: 26px; border-radius: 999px; }
 .hero-seal {
   position: absolute; left: 3%; top: 6%; width: 116px; height: 116px; z-index: 2; color: var(--gold);

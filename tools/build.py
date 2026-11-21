@@ -181,9 +181,58 @@ def build_poster(src: Path, rel: Path):
         return None
 
 
+# ------------------------------------------------------------------ تواريخ الإضافة
+def git_added_dates():
+    """تاريخ إضافة كل ملف من سجل git (يتتبّع إعادة التسمية).
+
+    وقت تعديل الملف (mtime) لا يصلح: عند النشر يُنسخ المستودع من جديد فتأخذ كل
+    الملفات وقت النسخ نفسه، فتظهر كل القطع «جديدة» ويفقد ترتيب «الأحدث» معناه.
+    """
+    try:
+        # النشر الآلي ينسخ آخر حفظة فقط؛ نجلب السجل كاملًا لنعرف تاريخ إضافة كل قطعة
+        shallow = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=ROOT,
+                                 capture_output=True, text=True).stdout.strip() == "true"
+        if shallow:
+            subprocess.run(["git", "fetch", "--quiet", "--unshallow"], cwd=ROOT, capture_output=True, timeout=180)
+        out = subprocess.run(
+            ["git", "-c", "core.quotepath=false", "log", "--reverse", "-M", "--name-status",
+             "--format=__%cI", "--", "media"],
+            cwd=ROOT, capture_output=True, check=True,
+        ).stdout.decode("utf-8", "replace")
+    except Exception:
+        return {}
+    dates, cur = {}, None
+    for line in out.splitlines():
+        if line.startswith("__"):
+            cur = line[2:].strip()
+            continue
+        parts = line.split("\t")
+        if len(parts) < 2:
+            continue
+        st = parts[0]
+        if st.startswith("A"):
+            dates.setdefault(parts[1], cur)
+        elif st.startswith("R") and len(parts) >= 3:
+            dates[parts[2]] = dates.pop(parts[1], cur)   # إعادة التسمية لا تجعل القطعة «جديدة»
+        elif st.startswith("D"):
+            dates.pop(parts[1], None)
+    return dates
+
+
+def added_time(path: Path, rel: Path, dates: dict) -> float:
+    iso = dates.get("media/" + rel.as_posix())
+    if iso:
+        try:
+            return datetime.fromisoformat(iso).timestamp()
+        except ValueError:
+            pass
+    return path.stat().st_mtime        # ملف لم يُحفظ في git بعد (معاينة محلية)
+
+
 # ------------------------------------------------------------------ الفحص
 def scan():
     items, skipped = [], 0
+    dates = git_added_dates()
 
     for path in sorted(MEDIA.rglob("*")):
         if not path.is_file():
@@ -202,7 +251,7 @@ def scan():
             continue
 
         category = rel.parts[0] if len(rel.parts) > 1 else DEFAULT_CAT
-        mtime = path.stat().st_mtime
+        mtime = added_time(path, rel, dates)
 
         if kind == "image":
             w, h = get_dims(path)
