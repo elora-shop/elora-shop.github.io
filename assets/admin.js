@@ -66,7 +66,10 @@
   }
   const repoBase = () => `/repos/${CFG.owner}/${CFG.repo}`;
   const rawURL = (p) => `https://raw.githubusercontent.com/${CFG.owner}/${CFG.repo}/${CFG.branch}/` + p.split('/').map(encodeURIComponent).join('/');
-  const siteURL = () => CFG.repo.toLowerCase() === `${CFG.owner.toLowerCase()}.github.io` ? `https://${CFG.repo}/` : `https://${CFG.owner}.github.io/${CFG.repo}/`;
+  // رابط المتجر: من حيث تُفتح اللوحة نفسها (Cloudflare أو GitHub أو دومين خاص) وإلا رابط GitHub
+  const siteURL = () => (/^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname))
+    ? new URL('./', location.href).href
+    : CFG.repo.toLowerCase() === `${CFG.owner.toLowerCase()}.github.io` ? `https://${CFG.repo}/` : `https://${CFG.owner}.github.io/${CFG.repo}/`;
 
   /** حفظة واحدة لكل التغييرات. entries: {path, blob} إضافة · {path, sha} نقل · {path, sha:null} حذف */
   async function commit(entries, message, onProgress) {
@@ -991,7 +994,8 @@
   /* ═══════════ الدخول ═══════════ */
   function guessRepo() {
     const h = location.hostname;
-    if (!h.endsWith('.github.io')) return { owner: '', repo: '' };
+    // على Cloudflare Pages أو دومين خاص: مستودع المتجر المعروف
+    if (!h.endsWith('.github.io')) return /^(localhost|127\.0\.0\.1|\[::1\])$/.test(h) || !h ? { owner: '', repo: '' } : { owner: 'elora-shop', repo: 'elora-shop.github.io' };
     const owner = h.split('.')[0];
     const seg = location.pathname.split('/').filter(Boolean)[0];
     return { owner, repo: seg && !seg.includes('.html') ? seg : h };
