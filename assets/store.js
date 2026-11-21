@@ -5,7 +5,7 @@
   'use strict';
 
   // إن لم تتوفر ملفات المتجر بجوار الصفحة (معاينة محلية) تُقرأ من الموقع المنشور
-  const REMOTE = 'https://afnanasaad2030.github.io/elora/';
+  const REMOTE = 'https://elora-shop.github.io/';
   const PAGE = 24;
 
   /* ================= أدوات ================= */
