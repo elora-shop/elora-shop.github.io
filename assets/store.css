@@ -178,7 +178,8 @@ h1, h2, h3 { font-family: var(--f-head); font-weight: 400; line-height: 1.35; ma
 .hero-pick .price { font-size: .88rem; font-weight: 500; }
 .hero-pick .i { width: 16px; height: 16px; margin-inline-start: auto; color: var(--muted); }
 .hero-dots { position: absolute; left: 4%; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 2; }
-.hero-dots button { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--text); opacity: .45; transition: all .3s; }
+.hero-dots button { position: relative; width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--text); opacity: .45; transition: all .3s; }
+.hero-dots button::after { content: ""; position: absolute; inset: -9px; }
 .hero-dots button[aria-current="true"] { background: var(--text); opacity: 1; height: 26px; border-radius: 999px; }
 .hero-seal {
   position: absolute; left: 3%; top: 6%; width: 116px; height: 116px; z-index: 2; color: var(--gold);

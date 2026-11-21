@@ -324,8 +324,23 @@
       pick.dataset.open = p.id;
       pick.innerHTML = `<img src="${esc(p.thumb)}" alt=""><span><small>قطعة مختارة</small><b>${esc(p.title)}</b>${priceHTML(p)}</span>${icon('next')}`;
     };
-    const play = () => { clearInterval(heroTimer); if (pool.length > 1 && !reduced) heroTimer = setInterval(() => show(cur + 1), 5000); };
+    // يتبدّل دائمًا، حتى في وضع «تقليل الحركة» (يفعّله توفير الطاقة في كثير من الجوالات):
+    // تبديل الصورة ليس حركة مزعجة، والتأثيرات الحركية نفسها تُلغى عبر CSS في ذلك الوضع.
+    const play = () => {
+      clearInterval(heroTimer);
+      if (pool.length > 1) heroTimer = setInterval(() => { if (!document.hidden) show(cur + 1); }, reduced ? 6000 : 5000);
+    };
     dots.onclick = (e) => { const b = e.target.closest('[data-slide]'); if (b) { show(Number(b.dataset.slide)); play(); } };
+    // السحب بالإصبع للتنقل بين الصور
+    let sx = null, sy = null;
+    box.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+    box.addEventListener('touchend', (e) => {
+      if (sx == null) return;
+      const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+      sx = null;
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { show(cur + (dx > 0 ? 1 : -1)); play(); }
+    }, { passive: true });
+    box.style.touchAction = 'pan-y';
     show(0);
     play();
   }
