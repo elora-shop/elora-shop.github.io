@@ -112,6 +112,10 @@ h1, h2, h3 { font-family: var(--f-head); font-weight: 400; line-height: 1.35; ma
 /* ---------- الشريط العلوي ---------- */
 .announce { background: var(--ink-bg); color: var(--ink-text); text-align: center; font-size: .8rem; letter-spacing: .02em; padding: 9px 16px; min-height: 38px; }
 .announce span { display: inline-block; transition: opacity .4s, transform .4s; }
+.announce.promo { background: linear-gradient(90deg, #5c2a35, #8c4d5c, #5c2a35); color: #fff; font-weight: 500; }
+.announce .cd { display: inline-flex; align-items: center; gap: 3px; margin-inline-start: 10px; direction: ltr; font-variant-numeric: tabular-nums; }
+.announce .cd b { background: rgba(255,255,255,.16); border-radius: 3px; padding: 0 6px; font-weight: 600; }
+.announce .cd i { font-style: normal; opacity: .8; font-size: .75rem; }
 .announce span.out { opacity: 0; transform: translateY(-6px); }
 .sample-banner { background: #fff4d6; color: #5a4300; text-align: center; font-size: .82rem; padding: 7px 16px; border-bottom: 1px solid #f0dfa8; }
 :root[data-theme="dark"] .sample-banner { background: #33290f; color: #f5dc9a; border-color: #4f4118; }

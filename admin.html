@@ -1,237 +1,486 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#fbf8f6">
+<meta name="theme-color" content="#faf6f2">
 <meta name="robots" content="noindex, nofollow">
 <title>لوحة تحكم ELORA</title>
-<link rel="icon" href="assets/icon.png?v=20260813140531">
-<link rel="apple-touch-icon" href="assets/icon.png?v=20260813140531">
+<link rel="icon" href="assets/icon.png">
+<link rel="apple-touch-icon" href="assets/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="assets/style.css?v=20260813140531">
-<link rel="stylesheet" href="assets/admin.css?v=20260813140531">
-</head>
-<body class="admin">
-
-<!-- تحذير مبكر: لو فشل تحميل الكود لأي سبب (متصفح قديم مثلًا)
-     تبقى الصفحة مفهومة بدل أن تظهر بيضاء تمامًا. -->
-<noscript>
-  <div class="fallback">
-    <b>المتصفح يمنع تشغيل الصفحة.</b>
-    فعّلي JavaScript من إعدادات المتصفح، أو افتحي الرابط من Chrome.
-  </div>
-</noscript>
-<div id="loadErr" class="fallback" hidden>
-  <b>تعذّر تشغيل لوحة التحكم على هذا المتصفح.</b>
-  حدّثي متصفحك من المتجر، أو افتحي الرابط من Google Chrome.
-  <a href="./">زيارة المتجر ←</a>
-</div>
+<link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script>
-  // يُلتقط قبل تحميل admin.js حتى يشمل أخطاء القراءة نفسها
-  window.addEventListener('error', function () {
-    var el = document.getElementById('loadErr');
-    if (el) el.hidden = false;
-  }, true);
+  (function () {
+    var t; try { t = JSON.parse(localStorage.getItem('elora:theme') || 'null'); } catch (e) {}
+    if (!t) t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = t;
+  })();
 </script>
+<link rel="stylesheet" href="assets/admin.css">
+</head>
+<body class="adm">
 
-<!-- ══════════ شاشة الإعداد ══════════
-     تظهر افتراضيًا بلا اعتماد على الكود؛ يخفيها الكود عند وجود جلسة محفوظة. -->
-<section id="setup" class="screen setup">
-  <img src="assets/logo.png?v=20260813140531" alt="ELORA" class="setup-logo">
-  <h1>ربط لوحة التحكم</h1>
-  <p class="muted">تُملأ مرة واحدة فقط على هذا الجهاز.</p>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
+    <symbol id="i-percent" viewBox="0 0 24 24"><path d="M19 5 5 19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></symbol>
+    <symbol id="i-truck" viewBox="0 0 24 24"><path d="M1 5h13v11H1zM14 9h4l4 4v3h-8z"/><circle cx="5.5" cy="18.5" r="2"/><circle cx="17.5" cy="18.5" r="2"/></symbol>
+    <symbol id="i-layout" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></symbol>
+    <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 21V9M7 14l5-5 5 5M5 3h14"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8M21 3v5h-5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M17.9 17.9A10 10 0 0 1 12 19c-7 0-11-7-11-7a18 18 0 0 1 5.1-5.9M9.9 4.2A9 9 0 0 1 12 4c7 0 11 7 11 7a18 18 0 0 1-2.2 3.2M1 1l22 22"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2M16 7l3 3M19 4l2 2"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2l-5-4.9 6.9-1z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5z"/></symbol>
+    <symbol id="i-gift" viewBox="0 0 24 24"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7z"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-wand" viewBox="0 0 24 24"><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8l1.4 1.4M17.8 6.2l1.4-1.4M12.2 6.2l-1.4-1.4M3 21l9-9"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></symbol>
+  </defs>
+</svg>
 
-  <label>اسم حسابك على GitHub
-    <input id="fOwner" type="text" inputmode="latin" placeholder="مثال: elora-shop" autocomplete="off" dir="ltr">
-  </label>
+<noscript><div class="fallback"><b>المتصفح يمنع تشغيل الصفحة.</b> فعّل JavaScript من إعدادات المتصفح، أو افتح الرابط من Chrome.</div></noscript>
 
-  <label>اسم المستودع
-    <input id="fRepo" type="text" inputmode="latin" placeholder="elora" autocomplete="off" dir="ltr">
-  </label>
-
-  <label>مفتاح الوصول (Token)
-    <input id="fToken" type="password" placeholder="github_pat_..." autocomplete="off" dir="ltr">
-  </label>
-
-  <p class="hint">
-    المفتاح يُحفظ على هذا الجهاز فقط ولا يُرسل لأي جهة أخرى.
-    طريقة إنشائه مشروحة في دليل ELORA.
-  </p>
-
-  <button id="btnConnect" class="btn-lg">اتصال</button>
-  <p id="setupErr" class="err" hidden></p>
-</section>
-
-<!-- ══════════ اللوحة ══════════ -->
-<section id="app" class="screen" hidden>
-
-  <header class="ah">
-    <img src="assets/logo.png?v=20260813140531" alt="ELORA" class="ah-logo">
-    <div class="ah-t">
-      <strong>لوحة التحكم</strong>
-      <span id="ahCount" class="muted"></span>
-    </div>
-    <button id="btnSettings" class="ah-icon" title="الإعدادات" aria-label="الإعدادات">⚙</button>
-    <a id="ahView" class="ah-link" target="_blank" rel="noopener">عرض المتجر</a>
-  </header>
-
-  <div id="banner" class="banner" hidden></div>
-
-  <div class="add-row">
-    <button id="btnAdd" class="btn-lg">＋ إضافة صور أو فيديو</button>
-    <input id="filePick" type="file" accept="image/*,video/*" multiple hidden>
-  </div>
-
-  <nav id="aFilters" class="filters"></nav>
-
-  <div id="aGrid" class="agrid"></div>
-  <p id="aEmpty" class="muted center pad" hidden>لا توجد منتجات بعد. اضغط «إضافة».</p>
-
-  <footer class="afoot">
-    <a href="help.html" class="btn-ghost-sm">الدليل</a>
-    <button id="btnRefresh" class="btn-ghost-sm">تحديث القائمة</button>
-    <button id="btnLogout" class="btn-ghost-sm danger">فصل هذا الجهاز</button>
-  </footer>
-</section>
-
-<!-- ══════════ مراجعة الملفات قبل النشر ══════════ -->
-<div id="review" class="sheet" hidden>
-  <div class="sheet-box">
-    <div class="sheet-head">
-      <strong>مراجعة قبل النشر</strong>
-      <button id="revClose" class="x" aria-label="إغلاق">✕</button>
-    </div>
-    <div id="revList" class="rev-list"></div>
-    <div class="sheet-foot">
-      <button id="revPublish" class="btn-lg">نشر</button>
+<!-- ═══════════════ شاشة الدخول ═══════════════ -->
+<section id="login" class="login" hidden>
+  <div class="login-art" aria-hidden="true">
+    <div class="la-arch" id="laArch"></div>
+    <div class="la-frame"></div>
+    <div class="la-quote">
+      <span class="latin">The Atelier</span>
+      <p>كل قطعة تبدأ من هنا.</p>
     </div>
   </div>
-</div>
 
-<!-- ══════════ خيارات منتج ══════════ -->
-<div id="itemSheet" class="sheet" hidden>
-  <div class="sheet-box">
-    <div class="sheet-head">
-      <strong id="isName"></strong>
-      <button id="isClose" class="x" aria-label="إغلاق">✕</button>
-    </div>
-    <div class="sheet-body">
-      <img id="isThumb" class="is-thumb" alt="">
-      <label>اسم المنتج
-        <input id="isTitle" type="text">
-      </label>
-      <label>التصنيف
-        <select id="isCat"></select>
-      </label>
-    </div>
-    <div class="sheet-foot col">
-      <button id="isSave" class="btn-lg">حفظ التعديل</button>
-      <button id="isDelete" class="btn-lg danger-fill">حذف المنتج</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════ إعدادات المتجر ══════════ -->
-<div id="settings" class="sheet" hidden>
-  <div class="sheet-box">
-    <div class="sheet-head">
-      <strong>إعدادات المتجر</strong>
-      <button id="setClose" class="x" aria-label="إغلاق">✕</button>
-    </div>
-    <div class="sheet-body">
-      <label>اسم المتجر
-        <input id="sBrand" type="text" placeholder="ELORA">
-      </label>
-
-      <label>الوصف تحت الاسم
-        <input id="sTagline" type="text" placeholder="إكسسوارات مصنوعة يدويًا بحب">
-      </label>
-
-      <label>رقم الواتساب
-        <input id="sWa" type="tel" inputmode="tel" dir="ltr" placeholder="967771234567">
-      </label>
-      <p class="hint nomargin">
-        برمز الدولة، وبدون <code dir="ltr">+</code> وبدون الصفر الذي قبل الرقم.<br>
-        مثال: <code dir="ltr">967771234567</code>
-      </p>
-      <p id="sWaPreview" class="wa-preview" hidden></p>
-
-      <label>نص الرسالة التي تصلك من الزبون
-        <input id="sWaMsg" type="text" placeholder="السلام عليكم، أعجبتني هذه القطعة">
-      </label>
-      <p class="hint nomargin">اسم المنتج يُضاف تلقائيًا في سطر جديد بعد النص.</p>
-
-      <label>حساب انستقرام <span class="opt">(اختياري)</span>
-        <input id="sIg" type="text" dir="ltr" placeholder="elora.store">
-      </label>
-
-      <h3 class="sec">المظهر</h3>
-
-      <label>شعار المتجر</label>
-      <div class="logo-box">
-        <img id="sLogoPrev" alt="">
-        <button id="sLogoPick" type="button" class="btn-ghost-sm">تغيير الشعار</button>
-        <input id="sLogoFile" type="file" accept="image/*" hidden>
-      </div>
-      <p class="hint nomargin">
-        يُفضَّل ملف <b>PNG بخلفية شفافة</b> ليظهر على أي لون.
-        الصورة ذات الخلفية البيضاء ستظهر بمربع أبيض حولها.
-      </p>
-
-      <label>حجم الشعار
-        <select id="sLogoSize">
-          <option value="small">صغير</option>
-          <option value="medium">متوسط</option>
-          <option value="large">كبير</option>
-        </select>
-      </label>
-
-      <label>لون الهوية <span class="opt">(الأزرار والتصنيف المختار)</span>
-        <input id="sAccent" type="color">
-      </label>
-
-      <label>لون الخلفية</label>
-      <div id="sBg" class="swatches">
-        <button type="button" data-bg="warm"  style="--sw:#fbf8f6">أبيض دافئ</button>
-        <button type="button" data-bg="white" style="--sw:#ffffff">أبيض نقي</button>
-        <button type="button" data-bg="blush" style="--sw:#fdf4f3">وردي فاتح</button>
-        <button type="button" data-bg="sand"  style="--sw:#faf7f0">رملي</button>
+  <div class="login-panel">
+    <div class="lp-in">
+      <div class="lp-brand">
+        <span class="brand-word">ELORA</span>
+        <span class="brand-sub">Atelier Dashboard</span>
       </div>
 
-      <label>شكل صور المنتجات
-        <select id="sRatio">
-          <option value="4/5">طولية (الأنسب للإكسسوارات)</option>
-          <option value="1/1">مربعة</option>
-          <option value="3/4">طولية قصيرة</option>
-        </select>
-      </label>
+      <h1>أهلًا بعودتك</h1>
+      <p class="lp-sub">اربط لوحة التحكم بمتجرك مرة واحدة على هذا الجهاز، ثم أدِر منتجاتك وأسعارك وعروضك من مكان واحد.</p>
 
-      <label>الوضع الافتراضي للزائر
-        <select id="sTheme">
-          <option value="light">فاتح</option>
-          <option value="dark">داكن</option>
-          <option value="auto">حسب إعدادات جهازه</option>
-        </select>
-      </label>
+      <form id="loginForm" class="lp-form" autocomplete="off" novalidate>
+        <div class="repo-chip" id="repoChip">
+          <span class="rc-ico"><svg class="i"><use href="#i-box"/></svg></span>
+          <span class="rc-txt"><small>متصل بمتجر</small><b dir="ltr" id="repoChipTxt">—</b></span>
+          <button type="button" class="link-btn" id="repoEdit">تغيير</button>
+        </div>
+
+        <div class="repo-fields" id="repoFields" hidden>
+          <label class="fld"><span>اسم الحساب أو المنظمة على GitHub</span>
+            <span class="inp"><svg class="i"><use href="#i-box"/></svg><input id="fOwner" type="text" dir="ltr" placeholder="elora-shop" autocapitalize="off" spellcheck="false"></span>
+          </label>
+          <label class="fld"><span>اسم المستودع</span>
+            <span class="inp"><svg class="i"><use href="#i-link"/></svg><input id="fRepo" type="text" dir="ltr" placeholder="elora-shop.github.io" autocapitalize="off" spellcheck="false"></span>
+          </label>
+        </div>
+
+        <label class="fld"><span>مفتاح الوصول</span>
+          <span class="inp big">
+            <svg class="i"><use href="#i-key"/></svg>
+            <input id="fToken" type="password" dir="ltr" placeholder="github_pat_…" autocapitalize="off" spellcheck="false">
+            <button type="button" class="inp-btn" id="tokPaste" title="لصق">لصق</button>
+            <button type="button" class="inp-btn ico" id="tokEye" aria-label="إظهار المفتاح"><svg class="i"><use href="#i-eye"/></svg></button>
+          </span>
+        </label>
+
+        <button class="btn btn-lg btn-block" id="btnConnect" type="submit">
+          <span>دخول إلى اللوحة</span><svg class="i"><use href="#i-next"/></svg>
+        </button>
+        <p id="loginErr" class="lp-err" hidden></p>
+
+        <details class="lp-help">
+          <summary><svg class="i"><use href="#i-help"/></svg> كيف أحصل على مفتاح الوصول؟</summary>
+          <ol>
+            <li>افتح <b dir="ltr">github.com/settings/personal-access-tokens/new</b></li>
+            <li><b>Resource owner:</b> اختر <b dir="ltr" class="own-name">elora-shop</b></li>
+            <li><b>Repository access:</b> Only select repositories ← اختر مستودع المتجر</li>
+            <li><b>Permissions:</b> Contents ← <b>Read and write</b></li>
+            <li>اضغط <b>Generate token</b> وانسخه والصقه هنا.</li>
+          </ol>
+        </details>
+      </form>
+
+      <p class="lp-trust"><svg class="i"><use href="#i-lock"/></svg> المفتاح يُحفظ على هذا الجهاز فقط، ولا يُرسل إلا إلى GitHub مباشرة.</p>
     </div>
-    <div class="sheet-foot">
-      <button id="setSave" class="btn-lg">حفظ الإعدادات</button>
+  </div>
+</section>
+
+<!-- ═══════════════ اللوحة ═══════════════ -->
+<div id="app" class="app" hidden>
+  <aside class="side" id="side">
+    <div class="side-brand">
+      <span class="brand-word">ELORA</span>
+      <span class="brand-sub">Atelier Dashboard</span>
+    </div>
+    <nav class="side-nav" id="sideNav">
+      <button data-go="home"><svg class="i"><use href="#i-home"/></svg><span>الرئيسية</span></button>
+      <button data-go="products"><svg class="i"><use href="#i-box"/></svg><span>المنتجات</span><b class="nb" id="nbProducts"></b></button>
+      <button data-go="prices"><svg class="i"><use href="#i-tag"/></svg><span>الأسعار والمخزون</span><b class="nb warn" id="nbPrices"></b></button>
+      <button data-go="offers"><svg class="i"><use href="#i-percent"/></svg><span>العروض والكوبونات</span></button>
+      <button data-go="shipping"><svg class="i"><use href="#i-truck"/></svg><span>التوصيل والدفع</span></button>
+      <button data-go="storefront"><svg class="i"><use href="#i-layout"/></svg><span>واجهة المتجر</span></button>
+      <button data-go="orders"><svg class="i"><use href="#i-receipt"/></svg><span>الطلبات</span></button>
+      <button data-go="settings"><svg class="i"><use href="#i-gear"/></svg><span>إعدادات المتجر</span></button>
+    </nav>
+    <div class="side-foot">
+      <a id="viewStore" target="_blank" rel="noopener"><svg class="i"><use href="#i-external"/></svg><span>عرض المتجر</span></a>
+      <a href="help.html"><svg class="i"><use href="#i-help"/></svg><span>الدليل</span></a>
+      <button id="btnLogout" class="danger"><svg class="i"><use href="#i-logout"/></svg><span>فصل هذا الجهاز</span></button>
+    </div>
+  </aside>
+  <div class="side-scrim" id="sideScrim"></div>
+
+  <main class="main">
+    <header class="top">
+      <button class="icon-btn only-m" id="menuBtn" aria-label="القائمة"><svg class="i"><use href="#i-menu"/></svg></button>
+      <div class="top-t">
+        <h1 id="viewTitle">الرئيسية</h1>
+        <p id="viewSub"></p>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="btnRefresh" title="تحديث من المتجر" aria-label="تحديث"><svg class="i"><use href="#i-refresh"/></svg></button>
+        <button class="icon-btn" id="themeBtn" aria-label="الوضع الليلي"><svg class="i"><use href="#i-moon"/></svg></button>
+      </div>
+    </header>
+
+    <div id="banner" class="banner" hidden></div>
+
+    <!-- الرئيسية -->
+    <section class="view" data-view="home">
+      <div class="hello">
+        <div>
+          <span class="kicker latin" id="helloKicker">Good day</span>
+          <h2 id="helloTitle">مرحبًا بك في مشغل ELORA</h2>
+          <p id="helloSub"></p>
+        </div>
+        <div class="hello-actions">
+          <button class="btn" data-act="add"><svg class="i"><use href="#i-upload"/></svg> إضافة منتجات</button>
+          <button class="btn btn-ghost" data-go="offers"><svg class="i"><use href="#i-percent"/></svg> كوبون جديد</button>
+        </div>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-h"><h3>جاهزية المتجر</h3><span class="pct" id="readyPct"></span></div>
+          <div class="ready-bar"><span id="readyBar"></span></div>
+          <ul class="checklist" id="checklist"></ul>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>بلا سعر بعد</h3><button class="link-btn" data-go="prices">تسعير الكل</button></div>
+          <div class="mini-list" id="unpricedList"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- المنتجات -->
+    <section class="view" data-view="products" hidden>
+      <div class="toolbar">
+        <button class="btn" data-act="add"><svg class="i"><use href="#i-upload"/></svg> إضافة صور أو فيديو</button>
+        <label class="search"><svg class="i"><use href="#i-search"/></svg><input id="pSearch" type="search" placeholder="ابحث باسم المنتج…"></label>
+      </div>
+      <div class="chips" id="pChips"></div>
+      <div class="pgrid" id="pGrid"></div>
+      <p class="empty" id="pEmpty" hidden>لا توجد منتجات مطابقة.</p>
+    </section>
+
+    <!-- الأسعار -->
+    <section class="view" data-view="prices" hidden>
+      <div class="toolbar">
+        <label class="search"><svg class="i"><use href="#i-search"/></svg><input id="prSearch" type="search" placeholder="ابحث…"></label>
+        <label class="switch-l"><input type="checkbox" id="prOnlyMissing"><span>بلا سعر فقط</span></label>
+        <button class="btn btn-ghost" id="btnBulk"><svg class="i"><use href="#i-wand"/></svg> تعديل جماعي</button>
+      </div>
+      <div class="chips" id="prChips"></div>
+      <div class="ptable" id="prTable"></div>
+      <p class="hint center">اترك «قبل الخصم» فارغًا إن لم يكن على القطعة خصم · اترك «المخزون» فارغًا إن كانت الكمية مفتوحة · <b>0</b> = نفدت</p>
+    </section>
+
+    <!-- العروض -->
+    <section class="view" data-view="offers" hidden>
+      <div class="card promo-card">
+        <div class="card-h">
+          <h3><svg class="i"><use href="#i-clock"/></svg> شريط العرض المؤقت</h3>
+          <label class="toggle"><input type="checkbox" id="promoOn"><span></span></label>
+        </div>
+        <p class="hint">رسالة تظهر أعلى المتجر مع عدّاد تنازلي حتى نهاية العرض. مثال: «خصم ٢٠٪ على كل الحقائب».</p>
+        <div class="row2">
+          <label class="fld"><span>نص العرض</span><input id="promoText" type="text" maxlength="90" placeholder="خصم ٢٠٪ على كل الحقائب بكود BAGS20"></label>
+          <label class="fld"><span>ينتهي في</span><input id="promoEnds" type="datetime-local"></label>
+        </div>
+        <div class="promo-preview" id="promoPreview"></div>
+      </div>
+
+      <div class="sec-h">
+        <div><h3>كوبونات الخصم</h3><p class="hint">أكواد يكتبها الزبون في السلة ليحصل على الخصم.</p></div>
+        <button class="btn" id="btnNewCoupon"><svg class="i"><use href="#i-plus"/></svg> كوبون جديد</button>
+      </div>
+      <div class="coupons" id="coupons"></div>
+    </section>
+
+    <!-- التوصيل والدفع -->
+    <section class="view" data-view="shipping" hidden>
+      <div class="card">
+        <div class="card-h"><h3><svg class="i"><use href="#i-truck"/></svg> مناطق التوصيل</h3><button class="btn btn-ghost sm" id="addZone"><svg class="i"><use href="#i-plus"/></svg> منطقة</button></div>
+        <p class="hint">يختار الزبون منطقته عند الطلب، فتُضاف رسومها للإجمالي. اترك القائمة فارغة إن كنت تحدد التوصيل مع كل زبون.</p>
+        <div class="zones" id="zones"></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-h"><h3>توصيل مجاني</h3></div>
+          <label class="fld"><span>عندما يتجاوز الطلب</span><span class="inp money"><input id="freeOver" type="number" min="0" step="100" placeholder="0 = إيقاف"><em class="cur"></em></span></label>
+          <p class="hint">يظهر للزبون شريط «أضف … لتحصل على توصيل مجاني».</p>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3><svg class="i"><use href="#i-gift"/></svg> تغليف هدية</h3><label class="toggle"><input type="checkbox" id="giftOn"><span></span></label></div>
+          <label class="fld"><span>رسوم التغليف</span><span class="inp money"><input id="giftFee" type="number" min="0" step="100" placeholder="0 = مجاني"><em class="cur"></em></span></label>
+          <p class="hint">يستطيع الزبون إضافة رسالة إهداء مع الطلب.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>طرق الدفع</h3></div>
+        <p class="hint">تظهر للزبون في آخر خطوة من الطلب.</p>
+        <div class="tags" id="payTags"></div>
+        <form class="tag-add" id="payAdd"><input type="text" placeholder="مثال: الدفع عند الاستلام" maxlength="40"><button class="btn btn-ghost sm" type="submit"><svg class="i"><use href="#i-plus"/></svg> إضافة</button></form>
+        <div class="quick-tags" id="payQuick"></div>
+      </div>
+    </section>
+
+    <!-- واجهة المتجر -->
+    <section class="view" data-view="storefront" hidden>
+      <div class="card">
+        <div class="card-h"><h3>العنوان الرئيسي</h3></div>
+        <div class="row2">
+          <label class="fld"><span>السطر الأول</span><input id="heroTitle" type="text" maxlength="50"></label>
+          <label class="fld"><span>السطر الملوّن</span><input id="heroAccent" type="text" maxlength="50"></label>
+        </div>
+        <div class="hero-preview" id="heroPreview"></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-h"><h3>شريط الإعلانات</h3></div>
+          <p class="hint">رسالة في كل سطر، تتبدّل أعلى المتجر.</p>
+          <textarea id="announces" rows="4"></textarea>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>الشريط المتحرك</h3></div>
+          <p class="hint">عبارات قصيرة، كل عبارة في سطر.</p>
+          <textarea id="perks" rows="4"></textarea>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>حكاية ELORA</h3></div>
+        <div class="row2">
+          <label class="fld"><span>العنوان</span><input id="storyTitle" type="text" maxlength="40"></label>
+          <label class="fld"><span>الصورة</span><select id="storyImage"></select></label>
+        </div>
+        <label class="fld"><span>النص</span><textarea id="storyText" rows="3" maxlength="400"></textarea></label>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>أسئلة شائعة</h3><button class="btn btn-ghost sm" id="addFaq"><svg class="i"><use href="#i-plus"/></svg> سؤال</button></div>
+        <div class="qa-list" id="faqList"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>آراء العملاء</h3><button class="btn btn-ghost sm" id="addTesti"><svg class="i"><use href="#i-plus"/></svg> رأي</button></div>
+        <p class="hint">أضف آراء حقيقية وصلتك من زبائنك. القسم يختفي من المتجر إن كانت القائمة فارغة.</p>
+        <div class="qa-list" id="testiList"></div>
+      </div>
+    </section>
+
+    <!-- الطلبات -->
+    <section class="view" data-view="orders" hidden>
+      <div class="card orders-hero">
+        <div class="oh-ico"><svg class="i"><use href="#i-receipt"/></svg></div>
+        <div>
+          <h3>طلباتك في جدول Google</h3>
+          <p class="hint">كل طلب يصل مباشرة إلى جدول «طلبات ELORA» مع بريد تنبيه. غيّر عمود «الحالة» هناك ليراها الزبون في «طلباتي».</p>
+        </div>
+        <a class="btn" id="openSheet" target="_blank" rel="noopener"><svg class="i"><use href="#i-external"/></svg> فتح جدول الطلبات</a>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>الربط</h3><span class="status-dot" id="epStatus"></span></div>
+        <label class="fld"><span>رابط استقبال الطلبات (Web app)</span><span class="inp"><svg class="i"><use href="#i-link"/></svg><input id="orderEp" type="url" dir="ltr" placeholder="https://script.google.com/macros/s/…/exec"><button type="button" class="inp-btn" id="testEp">اختبار</button></span></label>
+        <label class="fld"><span>رابط جدول الطلبات <small>(يظهر لك فقط هنا)</small></span><span class="inp"><svg class="i"><use href="#i-link"/></svg><input id="sheetUrl" type="url" dir="ltr" placeholder="https://docs.google.com/spreadsheets/d/…"></span></label>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>تتبّع طلب</h3></div>
+        <form class="track-form" id="trackForm"><input type="text" dir="ltr" placeholder="EL-261121-XXXXX" id="trackId"><button class="btn btn-ghost sm" type="submit">عرض الحالة</button></form>
+        <p class="hint" id="trackRes"></p>
+      </div>
+    </section>
+
+    <!-- الإعدادات -->
+    <section class="view" data-view="settings" hidden>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-h"><h3>هوية المتجر</h3></div>
+          <label class="fld"><span>اسم المتجر</span><input id="sBrand" type="text" placeholder="ELORA"></label>
+          <label class="fld"><span>الوصف</span><input id="sTagline" type="text" placeholder="إكسسوارات مصنوعة يدويًا بحب"></label>
+          <label class="fld"><span>الشعار</span></label>
+          <div class="logo-box"><img id="sLogoPrev" alt=""><button type="button" class="btn btn-ghost sm" id="sLogoPick"><svg class="i"><use href="#i-image"/></svg> تغيير الشعار</button><input id="sLogoFile" type="file" accept="image/*" hidden></div>
+          <label class="fld"><span>الوضع الافتراضي للزائر</span><select id="sTheme"><option value="light">فاتح</option><option value="dark">داكن</option><option value="auto">حسب جهاز الزائر</option></select></label>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>التواصل</h3></div>
+          <label class="fld"><span>رقم واتساب الطلبات</span><span class="inp"><svg class="i"><use href="#i-chat"/></svg><input id="sWa" type="tel" dir="ltr" placeholder="967771234567"></span></label>
+          <p class="wa-check" id="sWaCheck" hidden></p>
+          <label class="fld"><span>رسالة «اسأل عن القطعة»</span><input id="sWaMsg" type="text"></label>
+          <label class="fld"><span>حساب إنستقرام</span><span class="inp"><span class="at">@</span><input id="sIg" type="text" dir="ltr" placeholder="elor.a_5"></span></label>
+          <div class="row2">
+            <label class="fld"><span>العملة</span><input id="sCur" type="text" maxlength="8" placeholder="ر.ي"></label>
+            <label class="fld"><span>الأرقام</span><select id="sDigits"><option value="arab">عربية ١٢٣</option><option value="latn">لاتينية 123</option></select></label>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="mnav">
+    <button data-go="home"><svg class="i"><use href="#i-home"/></svg><span>الرئيسية</span></button>
+    <button data-go="products"><svg class="i"><use href="#i-box"/></svg><span>المنتجات</span></button>
+    <button data-go="prices"><svg class="i"><use href="#i-tag"/></svg><span>الأسعار</span></button>
+    <button data-go="offers"><svg class="i"><use href="#i-percent"/></svg><span>العروض</span></button>
+    <button id="moreBtn"><svg class="i"><use href="#i-dots"/></svg><span>المزيد</span></button>
+  </nav>
+
+  <div class="savebar" id="savebar" hidden>
+    <span class="sb-dot"></span>
+    <span class="sb-txt" id="sbTxt">تعديلات غير محفوظة</span>
+    <button class="btn btn-ghost sm" id="sbDiscard">تراجع</button>
+    <button class="btn sm" id="sbSave"><svg class="i"><use href="#i-check"/></svg> حفظ ونشر</button>
+  </div>
+</div>
+
+<input id="filePick" type="file" accept="image/*,video/*" multiple hidden>
+
+<!-- مراجعة الملفات قبل النشر -->
+<div class="sheet" id="review" hidden>
+  <div class="sheet-box wide">
+    <div class="sheet-h"><h3>منتجات جديدة</h3><button class="icon-btn" data-close aria-label="إغلاق"><svg class="i"><use href="#i-close"/></svg></button></div>
+    <div class="sheet-b"><div class="rev-list" id="revList"></div></div>
+    <div class="sheet-f"><button class="btn btn-lg btn-block" id="revPublish">نشر</button></div>
+  </div>
+</div>
+
+<!-- محرر المنتج -->
+<div class="sheet" id="itemSheet" hidden>
+  <div class="sheet-box wide">
+    <div class="sheet-h"><h3 id="isName"></h3><button class="icon-btn" data-close aria-label="إغلاق"><svg class="i"><use href="#i-close"/></svg></button></div>
+    <div class="sheet-b item-ed">
+      <div class="ie-media">
+        <img id="isThumb" alt="">
+        <a class="link-btn" id="isView" target="_blank" rel="noopener"><svg class="i"><use href="#i-external"/></svg> عرضها في المتجر</a>
+      </div>
+      <div class="ie-form">
+        <label class="fld"><span>اسم المنتج</span><input id="isTitle" type="text"></label>
+        <label class="fld"><span>التصنيف</span><select id="isCat"></select></label>
+        <div class="row2">
+          <label class="fld"><span>السعر</span><span class="inp money"><input id="isPrice" type="number" min="0" step="100" placeholder="عند الطلب"><em class="cur"></em></span></label>
+          <label class="fld"><span>قبل الخصم <small>(اختياري)</small></span><span class="inp money"><input id="isOld" type="number" min="0" step="100"><em class="cur"></em></span></label>
+        </div>
+        <div class="row2">
+          <label class="fld"><span>المخزون <small>(فارغ = مفتوح)</small></span><input id="isStock" type="number" min="0" step="1" placeholder="∞"></label>
+          <div class="fld"><span>السعر يبدأ من</span><label class="toggle-row"><input type="checkbox" id="isFrom"><i></i><small>يظهر «يبدأ من …»</small></label></div>
+        </div>
+        <label class="fld"><span>الوصف <small>(اختياري)</small></span><textarea id="isDesc" rows="3" maxlength="300" placeholder="قطعة مصنوعة يدويًا…"></textarea></label>
+        <div class="flags">
+          <label class="flag"><input type="checkbox" id="isFeat"><span><svg class="i"><use href="#i-star"/></svg> مميّزة في الواجهة</span></label>
+          <label class="flag"><input type="checkbox" id="isHidden"><span><svg class="i"><use href="#i-eyeoff"/></svg> إخفاء من المتجر</span></label>
+        </div>
+        <div class="price-preview" id="isPreview"></div>
+      </div>
+    </div>
+    <div class="sheet-f split">
+      <button class="btn btn-ghost danger" id="isDelete"><svg class="i"><use href="#i-trash"/></svg> حذف</button>
+      <button class="btn btn-lg" id="isSave"><svg class="i"><use href="#i-check"/></svg> حفظ ونشر</button>
     </div>
   </div>
 </div>
 
-<!-- ══════════ شاشة الانتظار ══════════ -->
-<div id="busy" class="busy" hidden>
-  <div class="spinner"></div>
-  <p id="busyMsg">جارٍ العمل…</p>
+<!-- تعديل جماعي للأسعار -->
+<div class="sheet" id="bulkSheet" hidden>
+  <div class="sheet-box">
+    <div class="sheet-h"><h3><svg class="i"><use href="#i-wand"/></svg> تعديل جماعي</h3><button class="icon-btn" data-close aria-label="إغلاق"><svg class="i"><use href="#i-close"/></svg></button></div>
+    <div class="sheet-b">
+      <label class="fld"><span>على أي قطع؟</span><select id="bkScope"></select></label>
+      <div class="fld"><span>ماذا تريد أن تفعل؟</span>
+        <div class="opts" id="bkAct">
+          <label><input type="radio" name="bk" value="sale" checked><b>خصم بنسبة</b><small>يظهر السعر القديم مشطوبًا</small></label>
+          <label><input type="radio" name="bk" value="unsale"><b>إلغاء الخصم</b><small>يرجع السعر الأصلي</small></label>
+          <label><input type="radio" name="bk" value="adjust"><b>رفع أو خفض</b><small>بنسبة مئوية دون إظهار خصم</small></label>
+          <label><input type="radio" name="bk" value="set"><b>سعر موحّد</b><small>نفس السعر لكل القطع المختارة</small></label>
+        </div>
+      </div>
+      <div class="row2">
+        <label class="fld" id="bkValWrap"><span id="bkValLbl">النسبة ٪</span><input id="bkVal" type="number" step="1"></label>
+        <label class="fld"><span>التقريب</span><select id="bkRound"><option value="1">بدون</option><option value="50">لأقرب ٥٠</option><option value="100" selected>لأقرب ١٠٠</option><option value="500">لأقرب ٥٠٠</option></select></label>
+      </div>
+      <p class="bk-prev" id="bkPrev"></p>
+    </div>
+    <div class="sheet-f"><button class="btn btn-lg btn-block" id="bkApply">تطبيق</button></div>
+  </div>
 </div>
 
-<div id="toast" class="toast" hidden></div>
+<!-- محرر الكوبون -->
+<div class="sheet" id="couponSheet" hidden>
+  <div class="sheet-box">
+    <div class="sheet-h"><h3 id="cpTitle">كوبون جديد</h3><button class="icon-btn" data-close aria-label="إغلاق"><svg class="i"><use href="#i-close"/></svg></button></div>
+    <div class="sheet-b">
+      <label class="fld"><span>الكود</span><span class="inp"><input id="cpCode" type="text" dir="ltr" maxlength="20" placeholder="ELORA10" autocapitalize="characters" spellcheck="false"><button type="button" class="inp-btn" id="cpGen">توليد</button></span></label>
+      <div class="fld"><span>نوع الخصم</span>
+        <div class="seg" id="cpType"><button type="button" data-v="percent" aria-pressed="true">نسبة ٪</button><button type="button" data-v="fixed" aria-pressed="false">مبلغ ثابت</button></div>
+      </div>
+      <div class="row2">
+        <label class="fld"><span id="cpValLbl">النسبة ٪</span><input id="cpVal" type="number" min="1" step="1"></label>
+        <label class="fld"><span>حد أدنى للطلب</span><span class="inp money"><input id="cpMin" type="number" min="0" step="100" placeholder="0"><em class="cur"></em></span></label>
+      </div>
+      <div class="row2">
+        <label class="fld"><span>ينتهي في <small>(اختياري)</small></span><input id="cpExp" type="date"></label>
+        <label class="fld"><span>الوصف للزبون</span><input id="cpLabel" type="text" maxlength="40" placeholder="خصم ١٠٪"></label>
+      </div>
+      <label class="toggle-row big"><input type="checkbox" id="cpActive" checked><i></i><span>الكوبون فعّال</span></label>
+      <div class="ticket preview" id="cpPreview"></div>
+    </div>
+    <div class="sheet-f split">
+      <button class="btn btn-ghost danger" id="cpDelete"><svg class="i"><use href="#i-trash"/></svg> حذف</button>
+      <button class="btn btn-lg" id="cpSave"><svg class="i"><use href="#i-check"/></svg> حفظ</button>
+    </div>
+  </div>
+</div>
 
-<script src="assets/admin.js?v=20260813140531"></script>
+<div class="busy" id="busy" hidden><div class="spinner"></div><p id="busyMsg">جارٍ العمل…</p></div>
+<div class="toasts" id="toasts"></div>
+
+<script src="assets/admin.js"></script>
 </body>
 </html>

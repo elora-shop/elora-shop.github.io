@@ -190,9 +190,28 @@
       wa && `<a href="${esc(wa)}" target="_blank" rel="noopener" aria-label="واتساب">${icon('chat')}</a>`,
     ].filter(Boolean).join('');
 
-    // الإعلانات المتناوبة
+    // شريط العرض المؤقت (بعدّاد تنازلي) يتقدّم على الإعلانات المتناوبة
+    const promo = SHOP.promo || {};
+    const promoEnds = promo.ends ? new Date(promo.ends) : null;
+    const promoLive = promo.active && promo.text && (!promoEnds || promoEnds > new Date());
     const ann = (SHOP.announcements || []).filter(Boolean);
-    if (ann.length) {
+    if (promoLive) {
+      const el = $('#announceText');
+      $('#announce').classList.add('promo');
+      const tick = () => {
+        const left = promoEnds ? promoEnds - Date.now() : null;
+        if (left != null && left <= 0) { location.reload(); return; }
+        let cd = '';
+        if (left != null) {
+          const d = Math.floor(left / 864e5), h = Math.floor(left / 36e5) % 24, m = Math.floor(left / 6e4) % 60, s = Math.floor(left / 1e3) % 60;
+          const p = (n) => { const t = String(n).padStart(2, '0'); return SHOP.digits === 'latn' ? t : t.replace(/\d/g, (x) => '٠١٢٣٤٥٦٧٨٩'[x]); };
+          cd = `<span class="cd" aria-label="ينتهي العرض خلال">${d ? `<b>${num(d)}</b><i>يوم</i>` : ''}<b>${p(h)}</b><i>:</i><b>${p(m)}</b><i>:</i><b>${p(s)}</b></span>`;
+        }
+        el.innerHTML = `✦ ${esc(promo.text)} ${cd}`;
+      };
+      tick();
+      if (promoEnds) setInterval(tick, 1000);
+    } else if (ann.length) {
       let i = 0;
       const el = $('#announceText');
       el.textContent = ann[0];
@@ -440,6 +459,8 @@
     const c = S.coupon && (SHOP.coupons || {})[S.coupon];
     if (S.coupon) {
       if (!c) couponMsg = 'الكوبون غير صالح';
+      else if (c.active === false) couponMsg = 'هذا الكوبون متوقف حاليًا';
+      else if (c.expires && c.expires < new Date().toISOString().slice(0, 10)) couponMsg = 'انتهت صلاحية هذا الكوبون';
       else if (c.min && sub < c.min) couponMsg = `يتطلب هذا الكوبون طلبًا بقيمة ${money(c.min)} على الأقل`;
       else {
         discount = c.type === 'percent' ? Math.round(sub * c.value / 100) : Math.min(c.value, sub);
