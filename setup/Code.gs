@@ -111,7 +111,7 @@ function doPost(e) {
     set('المجموع', num_(d.sub));
     set('الخصم', num_(d.discount) || '');
     set('الكوبون', clean_(d.coupon, 30));
-    set('التوصيل', d.ship == null ? '' : num_(d.ship));
+    set('التوصيل', d.shipQuote ? 'يُحدَّد عند التأكيد' : d.ship == null ? '' : num_(d.ship));
     set('تغليف هدية', d.giftWrap ? (num_(d.giftWrapFee) || 'نعم') : '');
     set('الإجمالي', num_(d.total));
     set('أسعار تُحدَّد لاحقًا', d.unpriced ? 'نعم' : '');
@@ -233,9 +233,10 @@ function verify_(d) {
       disc = c.type === 'percent' ? Math.round(sub * c.value / 100) : Math.min(c.value, sub);
     }
     if (shop.tiersOn !== false) (shop.tiers || []).forEach((t) => { if (sub >= t.min) disc = Math.max(disc, Math.round(sub * t.pct / 100)); });
-    const zone = (shop.deliveryZones || []).find((z) => z && z.name === d.zone);
+    const zone = (shop.deliveryZones || []).find((z) => z && (z.group ? z.group + ' — ' + z.name : z.name) === d.zone);
     const free = shop.freeShippingOver > 0 && sub >= shop.freeShippingOver;
-    const ship = zone ? (free ? 0 : zone.fee || 0) : 0;
+    const quote = !zone || zone.fee == null || zone.fee === '' || !isFinite(Number(zone.fee));   // يُحدَّد عند التأكيد
+    const ship = quote ? 0 : (free && zone.free !== false ? 0 : Number(zone.fee) || 0);
     const gw = shop.giftWrap && shop.giftWrap.enabled && d.giftWrap ? (shop.giftWrap.fee || 0) : 0;
     const total = Math.max(0, sub - disc) + ship + gw;
     const ok = Math.abs(total - (num_(d.total) || 0)) <= 1;

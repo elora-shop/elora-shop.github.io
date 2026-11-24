@@ -519,7 +519,11 @@
     save('cart'); updateCounts(); renderDrawer();
   }
 
+  /* مناطق التوصيل: {group: المحافظة/الدولة, name: المنطقة, fee: رقم أو فارغ = يُحدَّد عند التأكيد, note: المدة/الطريقة, free: يشمله التوصيل المجاني} */
   function zones() { return (SHOP.deliveryZones || []).filter((z) => z && z.name); }
+  const zKey = (z) => (z.group ? `${z.group} — ${z.name}` : z.name);
+  const zQuote = (z) => !!z && (z.fee == null || z.fee === '' || !Number.isFinite(Number(z.fee)));
+  const zFeeTxt = (z, free) => (zQuote(z) ? 'يُحدَّد عند التأكيد' : free && z.free !== false ? 'مجاني' : Number(z.fee) ? money(Number(z.fee)) : 'مجاني');
   function totals() {
     const lines = Object.entries(S.cart).map(([id, q]) => ({ p: BY.get(id), q })).filter((l) => l.p);
     lines.forEach((l) => { l.u = unitPrice(l.p, l.q); });
@@ -546,12 +550,13 @@
       if (couponOk) couponMsg = `خصم الكمية (${num(tier.pct)}٪) أفضل لك من الكوبون، فطبّقناه بدلًا منه`;
       discount = tierDisc; discLabel = `خصم الكمية ${num(tier.pct)}٪`;
     }
-    const zone = zones().find((z) => z.name === S.zone);
+    const zone = zones().find((z) => zKey(z) === S.zone) || null;
     const free = SHOP.freeShippingOver > 0 && sub >= SHOP.freeShippingOver;
-    const ship = zone ? (free ? 0 : zone.fee || 0) : null;
+    const shipQuote = zQuote(zone);
+    const ship = zone && !shipQuote ? (free && zone.free !== false ? 0 : Number(zone.fee) || 0) : null;
     const gw = SHOP.giftWrap && SHOP.giftWrap.enabled && S.gift.on ? (SHOP.giftWrap.fee || 0) : 0;
     const total = Math.max(0, sub - discount) + (ship || 0) + gw;
-    return { lines, count: cartCount(), sub, unpriced, discount, discLabel, tier, nextTier, couponMsg, couponOk, zone, free, ship, gw, total };
+    return { lines, count: cartCount(), sub, unpriced, discount, discLabel, tier, nextTier, couponMsg, couponOk, zone, free, ship, shipQuote, gw, total };
   }
 
   /* ================= الدرج الجانبي ================= */
@@ -635,13 +640,14 @@
     if (t.discount) rows.push(`<div class="sum-row disc"><span>الخصم · <bdi>${esc(t.discLabel)}</bdi></span><span>− ${money(t.discount)}</span></div>`);
     if (t.gw) rows.push(`<div class="sum-row"><span>تغليف الهدية</span><span>${money(t.gw)}</span></div>`);
     if ((withZone && zones().length) || t.zone) {
-      rows.push(`<div class="sum-row"><span>التوصيل${t.zone ? ` (${esc(t.zone.name)})` : ''}</span><span>${t.ship == null ? 'يُحدَّد في الخطوة التالية' : t.ship === 0 ? 'مجاني' : money(t.ship)}</span></div>`);
+      rows.push(`<div class="sum-row"><span>التوصيل${t.zone ? ` (${esc(zKey(t.zone))})` : ''}</span><span>${t.shipQuote ? 'يُحدَّد عند التأكيد' : t.ship == null ? 'يُحدَّد في الخطوة التالية' : t.ship === 0 ? 'مجاني' : money(t.ship)}</span></div>`);
     } else if (zones().length) {
       rows.push(`<div class="sum-row"><span>التوصيل</span><span>${t.free ? 'مجاني' : 'يُحسب عند إتمام الطلب'}</span></div>`);
     }
     if (anyPriced) {
-      rows.push(`<div class="sum-row total"><span>${t.unpriced ? 'الإجمالي المبدئي' : 'الإجمالي'}</span><span>${money(t.total)}</span></div>`);
+      rows.push(`<div class="sum-row total"><span>${t.unpriced ? 'الإجمالي المبدئي' : t.shipQuote ? 'الإجمالي (دون التوصيل)' : 'الإجمالي'}</span><span>${money(t.total)}</span></div>`);
       if (t.unpriced) rows.push(`<p class="note">بعض القطع سعرها عند الطلب، وسنؤكد لك الإجمالي النهائي عبر واتساب.</p>`);
+      else if (t.shipQuote) rows.push(`<p class="note">رسوم التوصيل إلى ${esc(zKey(t.zone))} تختلف حسب المكان وشركة النقل، وسنخبرك بها عند تأكيد الطلب قبل أي دفع.</p>`);
     } else {
       rows.push(`<div class="sum-row total"><span>الإجمالي</span><span>يُحدَّد عند التأكيد</span></div>`);
       rows.push(`<p class="note">سنرسل لك السعر النهائي عبر واتساب عند تأكيد طلبك.</p>`);
@@ -951,10 +957,24 @@
       </form>`;
     } else if (coStep === 1) {
       const zs = zones();
+      // قائمة قصيرة بلا مجموعات: بطاقات. قائمة طويلة أو مقسّمة بالمحافظات/الدول: قائمة منسدلة مجمّعة
+      const grouped = zs.length > 6 || zs.some((z) => z.group);
+      const groups = [...new Set(zs.map((z) => z.group || ''))];
+      const sel = zs.find((z) => zKey(z) === S.zone);
+      const zonePicker = !zs.length ? '' : grouped
+        ? `<label class="field"><span>منطقة التوصيل <small>(المحافظة أو الدولة)</small></span><select name="zone" required>
+            <option value="">اختر منطقتك…</option>
+            ${groups.map((g) => {
+              const opts = zs.filter((z) => (z.group || '') === g).map((z) => `<option value="${esc(zKey(z))}" ${S.zone === zKey(z) ? 'selected' : ''}>${esc(z.name)} · ${esc(zFeeTxt(z, t.free))}</option>`).join('');
+              return g ? `<optgroup label="${esc(g)}">${opts}</optgroup>` : opts;
+            }).join('')}
+          </select><span class="err">اختر منطقة التوصيل</span></label>
+          <p class="zone-note" id="zoneNote" ${sel && (sel.note || zQuote(sel)) ? '' : 'hidden'}>${sel ? esc([sel.note, zQuote(sel) ? 'نخبرك برسوم التوصيل عند تأكيد الطلب' : ''].filter(Boolean).join(' · ')) : ''}</p>`
+        : `<div class="field"><span>منطقة التوصيل</span><div class="radio-cards">${zs.map((z) => `
+          <label class="radio-card"><input type="radio" name="zone" value="${esc(zKey(z))}" ${S.zone === zKey(z) ? 'checked' : ''} required> <span>${esc(z.name)}${z.note ? `<br><small class="zn">${esc(z.note)}</small>` : ''}</span>
+          <small>${esc(zFeeTxt(z, t.free))}</small></label>`).join('')}</div><span class="err">اختر منطقة التوصيل</span></div>`;
       html += `<form class="co-form" id="coForm" novalidate>
-        ${zs.length ? `<div class="field"><span>منطقة التوصيل</span><div class="radio-cards">${zs.map((z) => `
-          <label class="radio-card"><input type="radio" name="zone" value="${esc(z.name)}" ${S.zone === z.name ? 'checked' : ''} required> ${esc(z.name)}
-          <small>${t.free ? 'مجاني' : z.fee ? money(z.fee) : 'مجاني'}</small></label>`).join('')}</div><span class="err">اختر منطقة التوصيل</span></div>` : ''}
+        ${zonePicker}
         <label class="field"><span>المدينة</span><input name="city" required autocomplete="address-level2" value="${esc(c.city || '')}"><span class="err">اكتب المدينة</span></label>
         <label class="field"><span>العنوان بالتفصيل <small>(الحي، الشارع، أقرب معلم)</small></span><textarea name="address" rows="2" required autocomplete="street-address">${esc(c.address || '')}</textarea><span class="err">اكتب عنوان التوصيل</span></label>
         <label class="field"><span>ملاحظات للطلب <small>(اختياري)</small></span><textarea name="notes" rows="2" placeholder="مثال: وقت مناسب للتوصيل، لون مفضل…">${esc(c.notes || '')}</textarea></label>
@@ -1077,14 +1097,14 @@
     L.push('*◆ ملخص الحساب*');
     if (!priced.length) {
       L.push('السعر يُحدَّد عند تأكيد الطلب');
-      if (t.zone) L.push(`التوصيل (${t.zone.name}): ${t.ship === 0 ? 'مجاني ✓' : money(t.ship)}`);
+      if (t.zone) L.push(`التوصيل (${zKey(t.zone)}): ${t.shipQuote ? 'يُحدَّد عند التأكيد' : t.ship === 0 ? 'مجاني ✓' : money(t.ship)}`);
       if (t.gw) L.push(`تغليف الهدية: ${money(t.gw)}`);
     } else {
       L.push(`المجموع${t.unpriced ? ' (للقطع المسعّرة)' : ''}: ${money(t.sub)}`);
       if (t.discount) L.push(`الخصم: − ${money(t.discount)}  (${t.discLabel})`);
       if (t.gw) L.push(`تغليف الهدية: ${money(t.gw)}`);
-      if (t.zone) L.push(`التوصيل (${t.zone.name}): ${t.ship === 0 ? 'مجاني ✓' : money(t.ship)}`);
-      L.push(`*الإجمالي${t.unpriced ? ' المبدئي' : ' المستحق'}: ${money(t.total)}*`);
+      if (t.zone) L.push(`التوصيل (${zKey(t.zone)}): ${t.shipQuote ? 'يُحدَّد عند التأكيد' : t.ship === 0 ? 'مجاني ✓' : money(t.ship)}`);
+      L.push(`*الإجمالي${t.unpriced ? ' المبدئي' : t.shipQuote ? ' (دون التوصيل)' : ' المستحق'}: ${money(t.total)}*`);
       if (t.unpriced) L.push('_يُضاف سعر بقية القطع عند التأكيد_');
       if (priced.some((l) => l.p.from)) L.push('_بعض الأسعار تبدأ من القيمة المذكورة_');
     }
@@ -1097,7 +1117,7 @@
     L.push('*◆ بيانات التوصيل*');
     L.push(`الاسم: ${oneLine(c.name)}`);
     L.push(`الجوال: ${latinDigits(c.phone).replace(/\s+/g, '')}`);
-    if (S.zone) L.push(`المنطقة: ${S.zone}`);
+    if (S.zone) L.push(`المنطقة: ${S.zone}${t.zone && t.zone.note ? ` (${t.zone.note})` : ''}`);
     if (c.city) L.push(`المدينة: ${oneLine(c.city)}`);
     if (c.address) L.push(`العنوان: ${oneLine(c.address)}`);
     if (c.notes) L.push(`ملاحظات: ${oneLine(c.notes)}`);
@@ -1149,7 +1169,7 @@
       name: c.name, phone: latinDigits(c.phone), zone: S.zone || '', city: c.city || '', address: c.address || '', notes: c.notes || '',
       couponCode: t.discount && t.discLabel.startsWith('كوبون') ? S.coupon : '',
       items: t.lines.map((l) => ({ key: l.p.title, title: l.p.title + (madeToOrder(l.p) ? (ready(l.p, l.q) ? ' (جاهزة)' : ` (تُصنع خلال ${lead(l.p)} أيام)`) : ''), q: l.q, price: l.u, from: l.p.from, link: productLink(l.p) })),
-      sub: t.sub, discount: t.discount, coupon: t.discount ? t.discLabel : '', ship: t.ship,
+      sub: t.sub, discount: t.discount, coupon: t.discount ? t.discLabel : '', ship: t.ship, shipQuote: !!t.shipQuote,
       giftWrap: !!S.gift.on, giftWrapFee: t.gw, giftNote: S.gift.on ? S.gift.note : '',
       total: t.total, unpriced: t.unpriced, payment: S.payment || '',
       website: ($('#hp') || {}).value || '',
@@ -1433,6 +1453,8 @@
     if (t.name === 'zone') {
       S.zone = t.value; save('zone');
       t.closest('.field')?.classList.remove('invalid');
+      const zn = $('#zoneNote'), z = zones().find((x) => zKey(x) === t.value);
+      if (zn) { const txt = z ? [z.note, zQuote(z) ? 'نخبرك برسوم التوصيل عند تأكيد الطلب' : ''].filter(Boolean).join(' · ') : ''; zn.textContent = txt; zn.hidden = !txt; }
     }
   });
   document.addEventListener('input', (e) => {

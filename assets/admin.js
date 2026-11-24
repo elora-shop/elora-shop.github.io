@@ -922,10 +922,15 @@
   function renderShipping() {
     const zs = SHOP.deliveryZones || [];
     $('#zones').innerHTML = zs.length ? zs.map((z, i) => `<div class="zone" data-z="${i}">
-      <input type="text" data-zf="name" value="${esc(z.name)}" placeholder="اسم المنطقة، مثل: داخل المدينة">
-      <span class="inp money"><input type="text" inputmode="numeric" data-zf="fee" value="${z.fee ?? ''}" placeholder="0 = مجاني"><em class="cur">${esc(SHOP.currency || 'ر.ي')}</em></span>
-      <button class="icon-btn" data-zdel="${i}" aria-label="حذف">${icon('trash')}</button></div>`).join('')
-      : '<p class="zone-empty">لا توجد مناطق بعد. أضف منطقة مثل «داخل المدينة».</p>';
+      <input type="text" data-zf="group" value="${esc(z.group || '')}" placeholder="المحافظة / الدولة" list="zoneGroups">
+      <input type="text" data-zf="name" value="${esc(z.name)}" placeholder="المنطقة، مثل: داخل المدينة">
+      <span class="inp money"><input type="text" inputmode="numeric" data-zf="fee" value="${z.fee ?? ''}" placeholder="عند التأكيد"><em class="cur">${esc(SHOP.currency || 'ر.ي')}</em></span>
+      <button class="icon-btn" data-zdel="${i}" aria-label="حذف">${icon('trash')}</button>
+      <input type="text" data-zf="note" class="zone-note-in" value="${esc(z.note || '')}" placeholder="ملاحظة للزبون (اختياري): المدة أو طريقة التوصيل، مثل «٢–٤ أيام عبر شركة نقل»">
+      <label class="zone-free"><input type="checkbox" data-zf="free" ${z.free !== false ? 'checked' : ''}> يشملها التوصيل المجاني</label>
+    </div>`).join('') + `<datalist id="zoneGroups">${[...new Set(zs.map((z) => z.group).filter(Boolean))].map((g) => `<option value="${esc(g)}">`).join('')}</datalist>`
+      : '<p class="zone-empty">لا توجد مناطق بعد. ابدأ بالاقتراحات أدناه، ثم عدّل الأسماء والرسوم.</p>';
+    $('#zoneQuick').innerHTML = ZONE_SUGGEST.map((s, i) => `<button type="button" data-zq="${i}">＋ ${esc(s.label)}</button>`).join('');
     $('#freeOver').value = SHOP.freeShippingOver || '';
     $('#makeDays').value = SHOP.makeDays || '';
     $('#pauseOn').checked = !!SHOP.pause?.on;
@@ -936,13 +941,31 @@
     $('#payTags').innerHTML = pays.length ? pays.map((p, i) => `<span class="tag">${esc(p)}<button data-pdel="${i}" aria-label="حذف">${icon('close')}</button></span>`).join('') : '<span class="hint">لم تُضف طرق دفع بعد.</span>';
     $('#payQuick').innerHTML = PAY_SUGGEST.filter((p) => !pays.includes(p)).map((p) => `<button type="button" data-pq="${esc(p)}">＋ ${esc(p)}</button>`).join('');
   }
-  $('#addZone').addEventListener('click', () => { (SHOP.deliveryZones ||= []).push({ name: '', fee: 0 }); markDirty('ship'); renderShipping(); $$('#zones [data-zf="name"]').pop()?.focus(); });
+  $('#addZone').addEventListener('click', () => { const last = (SHOP.deliveryZones || []).slice(-1)[0]; (SHOP.deliveryZones ||= []).push(last?.group ? { group: last.group, name: '', fee: null } : { name: '', fee: null }); markDirty('ship'); renderShipping(); $$('#zones [data-zf="name"]').pop()?.focus(); });
   $('#zones').addEventListener('input', (e) => {
     const f = e.target.dataset.zf;
     if (!f) return;
     const z = SHOP.deliveryZones[+e.target.closest('[data-z]').dataset.z];
-    z[f] = f === 'fee' ? (toNum(e.target.value) || 0) : e.target.value;
+    if (f === 'fee') z.fee = e.target.value.trim() === '' ? null : (toNum(e.target.value) ?? 0);   // فارغ = يُحدَّد عند التأكيد
+    else if (f === 'free') { if (e.target.checked) delete z.free; else z.free = false; }
+    else if (e.target.value.trim()) z[f] = e.target.value; else delete z[f];
     markDirty('ship');
+  });
+  // اقتراحات تبدأ بها (الرسوم تكتبها أنت؛ الفارغة = تُحدَّد مع الزبون)
+  const ZONE_SUGGEST = [
+    { label: 'داخل مدينتي', z: { group: '', name: 'داخل المدينة', fee: null } },
+    { label: 'ضواحي المدينة', z: { group: '', name: 'ضواحي وأطراف المدينة', fee: null } },
+    { label: 'محافظة أخرى (شركة نقل)', z: { group: 'محافظات أخرى', name: 'اكتب اسم المحافظة', fee: null, note: 'عبر شركة نقل، ٢–٤ أيام', free: false } },
+    { label: 'خارج اليمن', z: { group: 'خارج اليمن', name: 'اكتب اسم الدولة', fee: null, note: 'شحن دولي، نتفق على الطريقة والسعر', free: false } },
+  ];
+  $('#zoneQuick').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-zq]');
+    if (!b) return;
+    const s = ZONE_SUGGEST[+b.dataset.zq].z;
+    const z = { ...s }; if (!z.group) delete z.group;
+    (SHOP.deliveryZones ||= []).push(z);
+    markDirty('ship'); renderShipping();
+    $$('#zones [data-zf="name"]').pop()?.select();
   });
   $('#zones').addEventListener('click', (e) => { const b = e.target.closest('[data-zdel]'); if (b) { SHOP.deliveryZones.splice(+b.dataset.zdel, 1); markDirty('ship'); renderShipping(); } });
   $('#freeOver').addEventListener('input', (e) => { SHOP.freeShippingOver = toNum(e.target.value) || 0; markDirty('ship'); });

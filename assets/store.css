@@ -789,3 +789,8 @@ main:has(> .insta[hidden]) + .ftr { margin-top: 110px; }
 .bulk-box > div { display: flex; flex-wrap: wrap; gap: 8px; }
 .bulk-box span { display: grid; gap: 2px; padding: 6px 12px; border-radius: 10px; background: var(--surface); text-align: center; }
 .bulk-box small { color: var(--muted); font-size: .74rem; }
+
+/* مناطق التوصيل المجمّعة */
+.zone-note { margin: -6px 0 14px; font-size: .82rem; color: var(--gold); }
+.radio-card .zn { color: var(--muted); font-size: .78rem; }
+.field select optgroup { font-weight: 700; }

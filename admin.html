@@ -270,8 +270,9 @@
     <section class="view" data-view="shipping" hidden>
       <div class="card">
         <div class="card-h"><h3><svg class="i"><use href="#i-truck"/></svg> مناطق التوصيل</h3><button class="btn btn-ghost sm" id="addZone"><svg class="i"><use href="#i-plus"/></svg> منطقة</button></div>
-        <p class="hint">يختار الزبون منطقته عند الطلب، فتُضاف رسومها للإجمالي. اترك القائمة فارغة إن كنت تحدد التوصيل مع كل زبون.</p>
+        <p class="hint">لكل منطقة: <b>المحافظة أو الدولة</b> (تُجمَّع بها القائمة للزبون)، و<b>اسم المنطقة</b>، و<b>الرسوم</b>. اترك الرسوم <b>فارغة</b> للأماكن التي يتغيّر سعرها (محافظات بعيدة أو خارج اليمن)، فيظهر للزبون «يُحدَّد عند التأكيد» وتتفق معه على السعر. و<b>0</b> = توصيل مجاني.</p>
         <div class="zones" id="zones"></div>
+        <div class="quick-tags" id="zoneQuick"></div>
       </div>
       <div class="grid2">
         <div class="card">
