@@ -120,14 +120,18 @@
     return u;
   };
   // كلما زاد الطلب زاد الخصم: [{min: 20000, pct: 5}]
+  // وضع الإجازة: يبقى المتجر ظاهرًا ويتوقف إتمام الطلب
+  const paused = () => !!(SHOP.pause && SHOP.pause.on);
+  const pauseMsg = () => (SHOP.pause && SHOP.pause.text) || 'نعتذر، استقبال الطلبات متوقف مؤقتًا، ونعود قريبًا بإذن الله';
   const tiers = () => (SHOP.tiersOn === false ? [] : (SHOP.tiers || []).filter((x) => x && x.min > 0 && x.pct > 0).sort((a, b) => a.min - b.min));
   // رابط قصير وثابت لكل قطعة: …/elora/#i=k3f9a2 بدل اسم عربي طويل مشفّر
   const shortId = (s) => { let h = 0x811c9dc5; for (const ch of String(s)) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
   const BYSID = new Map();
   const siteBase = () => (/^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname))
     ? location.origin + location.pathname
-    : (SHOP.siteUrl || REMOTE);
-  const productLink = (p) => `${siteBase()}#i=${p.sid}`;
+    : (CFG.siteUrl || SHOP.siteUrl || REMOTE);
+  // صفحة مشاركة لكل قطعة (يولّدها build.py): تُظهر صورتها وسعرها في معاينة واتساب وتفتح القطعة في المتجر
+  const productLink = (p) => `${siteBase()}p/${p.sid}`;
 
   function waLink(text) {
     const n = String(CFG.whatsapp || '').replace(/\D/g, '');
@@ -227,7 +231,10 @@
     const promoEnds = promo.ends ? new Date(promo.ends) : null;
     const promoLive = promo.active && promo.text && (!promoEnds || promoEnds > new Date());
     const ann = (SHOP.announcements || []).filter(Boolean);
-    if (promoLive) {
+    if (paused()) {
+      $('#announce').classList.add('promo');
+      $('#announceText').textContent = `✦ ${pauseMsg()}`;
+    } else if (promoLive) {
       const el = $('#announceText');
       $('#announce').classList.add('promo');
       const tick = () => {
@@ -523,7 +530,7 @@
     if (S.coupon) {
       if (!c) couponMsg = 'الكوبون غير صالح';
       else if (c.active === false) couponMsg = 'هذا الكوبون متوقف حاليًا';
-      else if (c.expires && c.expires < new Date().toISOString().slice(0, 10)) couponMsg = 'انتهت صلاحية هذا الكوبون';
+      else if (c.expires && c.expires < new Date().toLocaleDateString('en-CA')) couponMsg = 'انتهت صلاحية هذا الكوبون';
       else if (c.min && sub < c.min) couponMsg = `يتطلب هذا الكوبون طلبًا بقيمة ${money(c.min)} على الأقل`;
       else {
         discount = c.type === 'percent' ? Math.round(sub * c.value / 100) : Math.min(c.value, sub);
@@ -682,7 +689,9 @@
         ${Object.keys(SHOP.coupons || {}).length ? `<div class="field" style="margin-top:14px"><span>كوبون الخصم</span>
           <form class="coupon" id="couponForm"><input id="couponIn" placeholder="أدخل الكود" value="${esc(S.coupon)}" autocomplete="off" dir="ltr"><button class="btn btn-ghost" type="submit">${S.coupon && t.couponOk ? 'تغيير' : 'تطبيق'}</button></form>
           ${t.couponMsg ? `<p class="coupon-msg ${t.couponOk ? 'ok' : 'err'}">${esc(t.couponMsg)}</p>` : ''}</div>` : ''}`;
-      foot.innerHTML = summaryHTML(t) + `<button class="btn btn-block btn-lg" id="toCheckout">إتمام الطلب ${icon('next')}</button>`;
+      foot.innerHTML = summaryHTML(t) + (paused()
+        ? `<p class="note pause-note">${icon('sparkle')} ${esc(pauseMsg())}</p>${waLink() ? `<a class="btn btn-block btn-ghost" target="_blank" rel="noopener" href="${esc(waLink('السلام عليكم، أود الاستفسار عن موعد استقبال الطلبات'))}">${icon('chat')} راسلنا على واتساب</a>` : ''}`
+        : `<button class="btn btn-block btn-lg" id="toCheckout">إتمام الطلب ${icon('next')}</button>`);
       return;
     }
     if (drawerMode === 'wish') {
@@ -868,6 +877,7 @@
 
   function openCheckout() {
     if (!cartCount()) return;
+    if (paused()) { toast(pauseMsg()); return; }
     closeDrawer();
     coStep = 0;
     lastOrder = null;
@@ -1137,7 +1147,8 @@
     return {
       id, at: at.toISOString(), channel: ch,
       name: c.name, phone: latinDigits(c.phone), zone: S.zone || '', city: c.city || '', address: c.address || '', notes: c.notes || '',
-      items: t.lines.map((l) => ({ title: l.p.title + (madeToOrder(l.p) ? (ready(l.p, l.q) ? ' (جاهزة)' : ` (تُصنع خلال ${lead(l.p)} أيام)`) : ''), q: l.q, price: l.u, from: l.p.from, link: productLink(l.p) })),
+      couponCode: t.discount && t.discLabel.startsWith('كوبون') ? S.coupon : '',
+      items: t.lines.map((l) => ({ key: l.p.title, title: l.p.title + (madeToOrder(l.p) ? (ready(l.p, l.q) ? ' (جاهزة)' : ` (تُصنع خلال ${lead(l.p)} أيام)`) : ''), q: l.q, price: l.u, from: l.p.from, link: productLink(l.p) })),
       sub: t.sub, discount: t.discount, coupon: t.discount ? t.discLabel : '', ship: t.ship,
       giftWrap: !!S.gift.on, giftWrapFee: t.gw, giftNote: S.gift.on ? S.gift.note : '',
       total: t.total, unpriced: t.unpriced, payment: S.payment || '',

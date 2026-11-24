@@ -327,6 +327,159 @@ def stamp_assets(version):
     return changed
 
 
+SITE_DEFAULT = "https://elora-shop.pages.dev/"
+BOT_UA = r"bot|crawl|spider|slurp|facebookexternalhit|whatsapp|telegram|twitter|linkedin|discord|preview|google|bing|yandex|baidu|duckduck|lighthouse"
+
+
+def read_json(name):
+    try:
+        return json.loads((ROOT / name).read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def site_url(cfg):
+    u = str(cfg.get("siteUrl") or SITE_DEFAULT).strip()
+    return u if u.endswith("/") else u + "/"
+
+
+def short_id(s: str) -> str:
+    """نفس دالة shortId في store.js (FNV-1a ثم أساس 36) حتى تتطابق الروابط."""
+    h = 0x811C9DC5
+    for ch in str(s):
+        h ^= ord(ch)
+        h = (h * 0x01000193) & 0xFFFFFFFF
+    digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+    out = ""
+    while True:
+        h, r = divmod(h, 36)
+        out = digits[r] + out
+        if not h:
+            return out
+
+
+def html_esc(s) -> str:
+    return (str(s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def fmt_price(n, cur):
+    return f"{int(n):,}".replace(",", "٬").translate(str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")) + f" {cur}"
+
+
+def write_product_pages(items, cfg, shop, base):
+    """صفحة صغيرة لكل قطعة: معاينة غنية في واتساب/إنستقرام وتظهر في Google، ثم تفتح القطعة في المتجر."""
+    out = ROOT / "p"
+    shutil.rmtree(out, ignore_errors=True)
+    out.mkdir()
+    prods = shop.get("products") or {}
+    brand = cfg.get("brandName") or "ELORA"
+    cur = shop.get("currency") or "ر.ي"
+    urls = []
+    for it in items:
+        extra = prods.get(it["id"]) or prods.get(it["title"]) or {}
+        if extra.get("hidden"):
+            continue
+        sid = short_id(it["id"])
+        price = extra.get("price")
+        priced = isinstance(price, (int, float))
+        price_txt = fmt_price(price, cur) if priced else "السعر عند الطلب"
+        desc = extra.get("desc") or f"قطعة من تشكيلة {it['category']} في {brand}، مصنوعة يدويًا بعناية وتفاصيل دقيقة."
+        img = base + (it["src"] if it.get("type") != "video" else (it.get("thumb") or it["src"]))
+        page = f"{base}p/{sid}"
+        target = f"{base}#i={sid}"
+        ld = {"@context": "https://schema.org", "@type": "Product", "name": it["title"], "image": [img],
+              "description": desc, "category": it["category"], "brand": {"@type": "Brand", "name": brand}, "url": page}
+        if priced:
+            ld["offers"] = {"@type": "Offer", "price": price, "priceCurrency": "YER", "url": page,
+                            "availability": "https://schema.org/InStock" if extra.get("stock") != 0 or shop.get("makeDays") else "https://schema.org/OutOfStock"}
+        title = f"{it['title']} — {brand}"
+        html = f"""<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{html_esc(title)}</title>
+<meta name="description" content="{html_esc(price_txt + ' · ' + desc)}">
+<link rel="canonical" href="{html_esc(page)}">
+<meta property="og:type" content="product">
+<meta property="og:site_name" content="{html_esc(brand)}">
+<meta property="og:title" content="{html_esc(title)}">
+<meta property="og:description" content="{html_esc(price_txt + ' · ' + desc)}">
+<meta property="og:image" content="{html_esc(img)}">
+<meta property="og:url" content="{html_esc(page)}">
+<meta property="og:locale" content="ar_AR">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
+<script>if(!/{BOT_UA}/i.test(navigator.userAgent))location.replace({json.dumps(target)});</script>
+<style>body{{margin:0;font-family:system-ui,sans-serif;background:#faf6f2;color:#241c19;display:grid;place-items:center;min-height:100vh;text-align:center}}main{{max-width:520px;padding:24px}}img{{width:100%;border-radius:18px}}a{{display:inline-block;margin-top:14px;padding:12px 26px;border-radius:999px;background:#241c19;color:#fff;text-decoration:none}}</style>
+</head>
+<body><main>
+<img src="{html_esc(img)}" alt="{html_esc(it['title'])}">
+<h1>{html_esc(it['title'])}</h1>
+<p><b>{html_esc(price_txt)}</b></p>
+<p>{html_esc(desc)}</p>
+<a href="{html_esc(target)}">اطلبها من متجر {html_esc(brand)}</a>
+</main></body>
+</html>
+"""
+        (out / f"{sid}.html").write_text(html, encoding="utf-8")
+        for alias in extra.get("aliases") or []:      # روابط قديمة لقطع أُعيدت تسميتها
+            if re.fullmatch(r"[0-9a-z]{1,13}", str(alias)) and alias != sid:
+                (out / f"{alias}.html").write_text(html, encoding="utf-8")
+        urls.append((page, (it.get("added") or "")[:10]))
+    return urls
+
+
+def write_seo(base, urls):
+    today = datetime.now().strftime("%Y-%m-%d")
+    rows = [f"  <url><loc>{html_esc(base)}</loc><lastmod>{today}</lastmod><priority>1.0</priority></url>"]
+    rows += [f"  <url><loc>{html_esc(u)}</loc>{f'<lastmod>{d}</lastmod>' if d else ''}</url>" for u, d in urls]
+    (ROOT / "sitemap.xml").write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(rows) + "\n</urlset>\n", encoding="utf-8")
+    (ROOT / "robots.txt").write_text(
+        f"User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /help\n\nSitemap: {base}sitemap.xml\n", encoding="utf-8")
+
+
+def absolute_og(base):
+    """روابط المعاينة يجب أن تكون كاملة (https://…) وإلا لا تظهر الصورة في واتساب وفيسبوك."""
+    p = ROOT / "index.html"
+    if not p.exists():
+        return
+    s = p.read_text(encoding="utf-8")
+    s = re.sub(r'(<meta property="og:image" content=")(?:https?://[^"]*/)?(assets/[^"]+)(">)', lambda m: m.group(1) + base + m.group(2) + m.group(3), s)
+    s = re.sub(r'\s*<meta property="og:url"[^>]*>|\s*<link rel="canonical"[^>]*>', "", s)
+    s = s.replace('<meta property="og:type" content="website">',
+                  f'<meta property="og:type" content="website">\n<meta property="og:url" content="{html_esc(base)}">\n<link rel="canonical" href="{html_esc(base)}">', 1)
+    p.write_text(s, encoding="utf-8")
+
+
+def write_version():
+    """رقم الحفظة المنشورة: تتابعه لوحة التحكم لتعرف أن التحديث ظهر فعلًا في المتجر."""
+    sha = os.environ.get("CF_PAGES_COMMIT_SHA") or os.environ.get("GITHUB_SHA") or ""
+    if not sha:
+        try:
+            sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, timeout=20).stdout.strip()
+        except Exception:
+            sha = ""
+    (ROOT / "version.json").write_text(json.dumps({"sha": sha, "built": datetime.now().isoformat(timespec="seconds")}), encoding="utf-8")
+
+
+def strip_internal():
+    """عند النشر فقط: لا تُنشر ملفات الإعداد والأدوات للزوار."""
+    if not (os.environ.get("CF_PAGES") or os.environ.get("GITHUB_ACTIONS")):
+        return 0
+    n = 0
+    for d in ("setup", "tools", ".github"):
+        if (ROOT / d).exists():
+            shutil.rmtree(ROOT / d, ignore_errors=True)
+            n += 1
+    for f in ROOT.glob("*.md"):
+        f.unlink()
+        n += 1
+    return n
+
+
 def prune_orphans(items):
     """يحذف المصغّرات التي لم يعد لها ملف أصلي."""
     if not THUMBS.exists():
@@ -385,6 +538,17 @@ def main():
         log(f"   (حُذفت {removed} مصغّرة قديمة)")
     if stamped:
         log(f"   (حُدّث رقم إصدار الملفات في {stamped} صفحة: {version})")
+
+    cfg, shop = read_json("site.config.json"), read_json("shop.json")
+    base = site_url(cfg)
+    urls = write_product_pages(items, cfg, shop, base)
+    write_seo(base, urls)
+    absolute_og(base)
+    write_version()
+    log(f"   (صفحات مشاركة: {len(urls)} · خريطة الموقع · version.json)")
+    stripped = strip_internal()
+    if stripped:
+        log(f"   (أُخفيت {stripped} من ملفات الإعداد الداخلية عن الزوار)")
     return 0
 
 

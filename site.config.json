@@ -12,5 +12,7 @@
   "defaultTheme": "light",
   "logoSize": "large",
   "bgTheme": "warm",
-  "cardRatio": "4/5"
+  "cardRatio": "4/5",
+  "siteUrl": "https://elora-shop.pages.dev/",
+  "tokenExpires": "2027-11-22"
 }

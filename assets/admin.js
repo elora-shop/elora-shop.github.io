@@ -60,6 +60,7 @@
     if (!r.ok) {
       let detail = '';
       try { detail = (await r.json()).message || ''; } catch { /* */ }
+      if (r.status === 401) detail = 'مفتاح الوصول انتهى أو أُلغي. أنشئ مفتاحًا جديدًا من GitHub ثم سجّل الدخول به (الخطوات في «الدليل»)';
       const e = new Error(detail || `HTTP ${r.status}`); e.status = r.status; throw e;
     }
     return r.status === 204 ? null : r.json();
@@ -90,6 +91,7 @@
     const nt = await gh(`${repoBase()}/git/trees`, { method: 'POST', body: { base_tree: head.tree.sha, tree } });
     const nc = await gh(`${repoBase()}/git/commits`, { method: 'POST', body: { message, tree: nt.sha, parents: [base] } });
     await gh(`${repoBase()}/git/refs/heads/${CFG.branch}`, { method: 'PATCH', body: { sha: nc.sha } });
+    return nc.sha;
   }
   const toBase64 = (blob) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob); });
   const jsonBlob = (o) => new Blob([JSON.stringify(o, null, 2) + '\n'], { type: 'application/json' });
@@ -234,22 +236,52 @@
     $('#savebar').hidden = !n;
     $('#sbTxt').textContent = n === 1 ? 'تعديل واحد غير محفوظ' : n === 2 ? 'تعديلان غير محفوظين' : `${num(n)} ${n <= 10 ? 'تعديلات غير محفوظة' : 'تعديلًا غير محفوظ'}`;
   }
-  function cleanShop() {
-    const s = JSON.parse(JSON.stringify(SHOP));
+  function cleanOf(obj) {
+    const s = JSON.parse(JSON.stringify(obj || {}));
     s.sampleData = false;
     if (s.products) for (const k of Object.keys(s.products)) if (!Object.keys(s.products[k]).length) delete s.products[k];
     return s;
   }
+  const cleanShop = () => cleanOf(SHOP);
+  /** دمج ثلاثي: ما غيّرتُه أنا يُطبَّق فوق أحدث نسخة منشورة (من جهاز آخر مثلًا) بدل أن يمحوها */
+  const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
+  function merge3(base, mine, theirs) {
+    if (canon(mine) === canon(base)) return theirs;
+    if (canon(theirs) === canon(base)) return mine;
+    if (!(isObj(base) && isObj(mine) && isObj(theirs))) return mine;      // تعارض على القيمة نفسها: تعديلي يفوز
+    const out = {};
+    for (const k of new Set([...Object.keys(base), ...Object.keys(mine), ...Object.keys(theirs)])) {
+      const b = base[k], m = mine[k], t = theirs[k];
+      let v;
+      if (canon(m) === canon(b)) v = t;                  // لم أغيّره: خذ الأحدث
+      else if (canon(t) === canon(b)) v = m;             // غيّرتُه أنا فقط
+      else v = isObj(b) && isObj(m) && isObj(t) ? merge3(b, m, t) : m;
+      if (v !== undefined) out[k] = v;
+    }
+    return out;
+  }
   async function saveAll(extra = [], message) {
+    // اجلب أحدث نسخة منشورة: إن عُدّلت من جهاز آخر بعد فتح اللوحة، ادمج بدل الكتابة فوقها
+    const [rShop, rSite] = await Promise.all([readJSON(SHOP_PATH), readJSON(CFG_PATH)]);
+    const remoteShop = canon(cleanOf(rShop)), remoteSite = canon(rSite);
+    let merged = false;
+    if (remoteShop !== ORIG_SHOP) {
+      SHOP = merge3(JSON.parse(ORIG_SHOP), cleanShop(), cleanOf(rShop));
+      SHOP.products ||= {}; SHOP.coupons ||= {};
+      merged = true;
+    }
+    if (remoteSite !== ORIG_SITE) { SITE = merge3(JSON.parse(ORIG_SITE), SITE, rSite); merged = true; }
     const shopNow = canon(cleanShop());
-    const siteChanged = canon(SITE) !== ORIG_SITE || !!stagedLogo;
-    if (!extra.length && shopNow === ORIG_SHOP && !siteChanged) {
+    const shopChanged = shopNow !== remoteShop;
+    const siteChanged = canon(SITE) !== remoteSite || !!stagedLogo;
+    if (!extra.length && !shopChanged && !siteChanged) {
+      snapshot();
       changes.clear();
       updateSavebar();
       return false;                      // لا شيء تغيّر فعلًا (مثلًا: تعديل ثم إرجاعه)
     }
     const entries = [...extra];
-    if (shopNow !== ORIG_SHOP) entries.push({ path: SHOP_PATH, blob: jsonBlob(cleanShop()) });
+    if (shopChanged) entries.push({ path: SHOP_PATH, blob: jsonBlob(cleanShop()) });
     if (siteChanged) {
       const next = { ...SITE };
       if (stagedLogo) { entries.push({ path: 'assets/logo.png', blob: stagedLogo.logo }, { path: 'assets/icon.png', blob: stagedLogo.icon }); next.logo = 'assets/logo.png'; }
@@ -257,12 +289,12 @@
     }
     const kinds = [...changes].map((c) => c.split(':')[0]);
     const msg = message || summarize(kinds);
-    await commit(entries, msg, (d, t) => t > 1 && busy(`جارٍ الرفع… ${num(d)}/${num(t)}`));
+    const sha = await commit(entries, msg, (d, t) => t > 1 && busy(`جارٍ الرفع… ${num(d)}/${num(t)}`));
     changes.clear();
     if (stagedLogo) { URL.revokeObjectURL(stagedLogo.url); stagedLogo = null; }
     snapshot();
     updateSavebar();
-    showBanner();
+    watchDeploy(sha, merged);
     return true;
   }
   function summarize(kinds) {
@@ -270,13 +302,32 @@
     const parts = [...new Set(kinds)].map((k) => m[k]).filter(Boolean);
     return 'لوحة التحكم: تحديث ' + (parts.join('، ') || 'المتجر');
   }
-  function showBanner() {
+  function showBanner(html, kind = '', hideAfter = 0) {
     const b = $('#banner');
-    b.className = 'banner';
-    b.innerHTML = `${icon('check')} تم الحفظ والنشر. يظهر التحديث في المتجر خلال دقيقة تقريبًا.`;
+    b.className = 'banner' + (kind ? ' ' + kind : '');
+    b.innerHTML = html;
     b.hidden = false;
     clearTimeout(showBanner._t);
-    showBanner._t = setTimeout(() => { b.hidden = true; }, 9000);
+    if (hideAfter) showBanner._t = setTimeout(() => { b.hidden = true; }, hideAfter);
+  }
+  /** يتابع الموقع بعد الحفظ حتى يظهر التحديث فعلًا (version.json يكتبه build.py برقم الحفظة) */
+  let deployWatch = 0;
+  async function watchDeploy(sha, merged) {
+    const my = ++deployWatch, started = Date.now();
+    const note = merged ? ' <small>(دُمجت تعديلاتك مع تحديثات أحدث من جهاز آخر)</small>' : '';
+    showBanner(`<span class="spin"></span> تم الحفظ، وجارٍ نشره في المتجر… يستغرق عادة دقيقة إلى ثلاث.${note}`, 'info');
+    while (my === deployWatch) {
+      await new Promise((r) => setTimeout(r, 15000));
+      if (my !== deployWatch) return;
+      try {
+        const v = await fetch(`${siteURL()}version.json?t=${Date.now()}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : {}));
+        if (v.sha === sha) { showBanner(`${icon('check')} ظهر التحديث في المتجر ✓ <a href="${esc(siteURL())}" target="_blank" rel="noopener">عرض المتجر</a>${note}`, 'ok', 15000); return; }
+      } catch { /* نحاول مجددًا */ }
+      if (Date.now() - started > 10 * 60000) {
+        showBanner(`${icon('alert')} حُفظت تعديلاتك، لكنها لم تظهر في المتجر بعد ١٠ دقائق. قد يكون النشر في Cloudflare متأخرًا أو فشل: افتح <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">Cloudflare</a> ← Workers &amp; Pages ← elora-shop ← Deployments.`, 'warn');
+        return;
+      }
+    }
   }
 
   $('#sbSave').addEventListener('click', async () => {
@@ -363,6 +414,18 @@
       stat('prices', 'percent', 'عليها خصم', num(sale), out || low ? `${num(out)} نفدت · ${num(low)} كمية محدودة` : 'المخزون بحالة جيدة'),
       stat('offers', 'sparkle', 'كوبونات فعّالة', num(coupons), SHOP.promo?.active ? 'شريط العرض يعمل' : 'لا يوجد عرض مؤقت'),
     ].join('');
+
+    // تنبيهات تمنع توقف المتجر دون أن تنتبه
+    const alerts = [];
+    if (SITE.tokenExpires) {
+      const left = Math.ceil((new Date(SITE.tokenExpires + 'T00:00') - Date.now()) / 864e5);
+      if (left <= 30) alerts.push(left <= 0 ? 'انتهى مفتاح الوصول! أنشئ مفتاحًا جديدًا الآن (الخطوات في «الدليل»).' : `مفتاح الوصول ينتهي بعد ${left === 1 ? 'يوم واحد' : left === 2 ? 'يومين' : left <= 10 ? `${num(left)} أيام` : `${num(left)} يومًا`}. جدّده من GitHub قبل أن تتوقف اللوحة عن الحفظ.`);
+    }
+    if (SHOP.pause?.on) alerts.push('استقبال الطلبات متوقف حاليًا (وضع الإجازة). أعد تشغيله من «التوصيل والدفع».');
+    const now0 = new Date().toISOString().slice(0, 10);
+    const expiring = Object.entries(SHOP.coupons || {}).filter(([, c]) => c.active !== false && c.expires && c.expires >= now0 && (new Date(c.expires) - Date.now()) < 3 * 864e5).map(([k]) => k);
+    if (expiring.length) alerts.push(`ينتهي قريبًا: ${expiring.join('، ')}. جهّز العرض التالي من «العروض».`);
+    $('#homeAlerts').innerHTML = alerts.map((a) => `<div class="banner warn">${icon('alert')} ${esc(a)}</div>`).join('');
 
     const waOk = /^\d{10,15}$/.test(SITE.whatsapp || '') && !/^0/.test(SITE.whatsapp || '');
     const tasks = [
@@ -865,6 +928,8 @@
       : '<p class="zone-empty">لا توجد مناطق بعد. أضف منطقة مثل «داخل المدينة».</p>';
     $('#freeOver').value = SHOP.freeShippingOver || '';
     $('#makeDays').value = SHOP.makeDays || '';
+    $('#pauseOn').checked = !!SHOP.pause?.on;
+    $('#pauseText').value = SHOP.pause?.text || '';
     $('#giftOn').checked = !!SHOP.giftWrap?.enabled;
     $('#giftFee').value = SHOP.giftWrap?.fee || '';
     const pays = SHOP.payments || [];
@@ -882,6 +947,11 @@
   $('#zones').addEventListener('click', (e) => { const b = e.target.closest('[data-zdel]'); if (b) { SHOP.deliveryZones.splice(+b.dataset.zdel, 1); markDirty('ship'); renderShipping(); } });
   $('#freeOver').addEventListener('input', (e) => { SHOP.freeShippingOver = toNum(e.target.value) || 0; markDirty('ship'); });
   $('#makeDays').addEventListener('input', (e) => { SHOP.makeDays = toNum(e.target.value) || 0; markDirty('ship'); });
+  ['pauseOn', 'pauseText'].forEach((id) => $('#' + id).addEventListener('input', () => {
+    SHOP.pause = { on: $('#pauseOn').checked, text: $('#pauseText').value.trim() };
+    if (!SHOP.pause.on && !SHOP.pause.text) delete SHOP.pause;
+    markDirty('ship');
+  }));
   ['giftOn', 'giftFee'].forEach((id) => $('#' + id).addEventListener('input', () => { SHOP.giftWrap = { enabled: $('#giftOn').checked, fee: toNum($('#giftFee').value) || 0 }; markDirty('ship'); }));
   function addPay(p) { p = p.trim(); if (!p) return; SHOP.payments ||= []; if (!SHOP.payments.includes(p)) SHOP.payments.push(p); markDirty('ship'); renderShipping(); }
   $('#payAdd').addEventListener('submit', (e) => { e.preventDefault(); const i = e.target.querySelector('input'); addPay(i.value); i.value = ''; });
@@ -971,6 +1041,8 @@
     $('#sTheme').value = SITE.defaultTheme || 'light';
     $('#sCur').value = SHOP.currency || '';
     $('#sDigits').value = SHOP.digits || 'arab';
+    $('#sSiteUrl').value = SITE.siteUrl || '';
+    $('#sTokenExp').value = SITE.tokenExpires || '';
     $('#sLogoPrev').src = stagedLogo ? stagedLogo.url : rawURL(SITE.logo || 'assets/logo.png') + '?t=' + Date.now();
     waCheck();
   }
@@ -990,6 +1062,8 @@
   siteField('sWaMsg', 'whatsappMessage', (v) => v);
   siteField('sIg', 'instagram', (v) => v.trim().replace(/^@/, ''));
   siteField('sTheme', 'defaultTheme');
+  siteField('sSiteUrl', 'siteUrl', (v) => { v = v.trim(); return v && !v.endsWith('/') ? v + '/' : v; });
+  siteField('sTokenExp', 'tokenExpires');
   $('#sCur').addEventListener('input', (e) => { SHOP.currency = e.target.value.trim() || 'ر.ي'; markDirty('site'); renderNavBadges(); });
   $('#sDigits').addEventListener('input', (e) => { SHOP.digits = e.target.value; NF = new Intl.NumberFormat(SHOP.digits === 'latn' ? 'en' : 'ar-u-nu-arab'); markDirty('site'); });
   $('#sLogoPick').addEventListener('click', () => $('#sLogoFile').click());

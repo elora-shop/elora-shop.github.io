@@ -1,3 +1,7 @@
 # ملفات تُبنى تلقائيًا عند النشر — لا داعي لرفعها
 data.json
 qr/
+/p/
+/sitemap.xml
+/robots.txt
+/version.json

@@ -16,15 +16,22 @@ const SHEET_NAME   = 'الطلبات';
 const STATUSES     = ['جديد', 'تم التأكيد', 'قيد التجهيز', 'تم الشحن', 'تم التسليم', 'ملغي'];
 // معرّف الجدول: الجزء بين /d/ و /edit في رابطه. يلزم فقط إن أنشأت المشروع من script.google.com بدل قائمة «Extensions» في الجدول.
 const SPREADSHEET_ID = '';
+// رابط ملف أسعار المتجر: يعيد الكود حساب المبلغ منه ليكشف أي تلاعب بالأسعار
+const SHOP_URL = 'https://elora-shop.pages.dev/shop.json';
+// حماية من سيل الطلبات الوهمية
+const MAX_PER_PHONE_HOUR = 5;      // أقصى عدد طلبات من الرقم نفسه خلال ساعة
+const MAX_PER_10_MIN     = 30;     // أقصى عدد طلبات من الجميع خلال ١٠ دقائق
 // ===============================================
 
+// الأعمدة الجديدة تُضاف في النهاية دائمًا حتى لا تختلط بأعمدة جدولك الحالي
 const HEADERS = [
   'رقم الطلب', 'التاريخ', 'الحالة', 'طريقة الإرسال',
   'الاسم', 'الجوال', 'مراسلة الزبون',
   'المنطقة', 'المدينة', 'العنوان',
   'القطع', 'عدد القطع',
   'المجموع', 'الخصم', 'الكوبون', 'التوصيل', 'تغليف هدية', 'الإجمالي', 'أسعار تُحدَّد لاحقًا',
-  'طريقة الدفع', 'رسالة الإهداء', 'ملاحظات الزبون', 'ملاحظاتك'
+  'طريقة الدفع', 'رسالة الإهداء', 'ملاحظات الزبون', 'ملاحظاتك',
+  'تحقق المبلغ'
 ];
 const COL = Object.fromEntries(HEADERS.map((h, i) => [h, i + 1]));
 
@@ -74,6 +81,9 @@ function doPost(e) {
 
     const sh = sheet_();
     if (findRow_(sh, d.id)) return json_({ ok: true, id: d.id, duplicate: true });  // لا تكرار لنفس الطلب
+    if (!rateOk_(d.phone)) return json_({ ok: false, error: 'rate' });
+    ensureHeaders_(sh);
+    const check = verify_(d);
 
     const items = d.items.slice(0, 60).map((it, i) => {
       const price = num_(it.price);
@@ -107,13 +117,15 @@ function doPost(e) {
     set('طريقة الدفع', clean_(d.payment, 60));
     set('رسالة الإهداء', clean_(d.giftNote, 300));
     set('ملاحظات الزبون', clean_(d.notes, 500));
+    set('تحقق المبلغ', check ? check.label : '');
 
     sh.appendRow(row);
     const r = sh.getLastRow();
     sh.getRange(r, 1, 1, HEADERS.length).setVerticalAlignment('top');
     sh.getRange(r, COL['التاريخ']).setNumberFormat('yyyy-mm-dd hh:mm');
+    if (check && !check.ok) sh.getRange(r, COL['الإجمالي'], 1, 1).setBackground('#fde2e1').setFontColor('#b3261e').setFontWeight('bold');
 
-    notify_(d, items, count);
+    if (MailApp.getRemainingDailyQuota() > 3) notify_(d, items, count, check);
     return json_({ ok: true, id: d.id });
   } catch (err) {
     return json_({ ok: false, error: String(err) });
@@ -170,7 +182,69 @@ function waLink_(phone) {
 function json_(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
-function notify_(d, items, count) {
+/** يمنع إغراق الجدول بطلبات وهمية: حد لكل رقم جوال وحد عام */
+function rateOk_(phone) {
+  const c = CacheService.getScriptCache();
+  const p = 'rp:' + String(phone || '').replace(/\D/g, '').slice(-9);
+  const g = 'rg:' + Math.floor(Date.now() / 600000);
+  const np = Number(c.get(p) || 0), ng = Number(c.get(g) || 0);
+  if (np >= MAX_PER_PHONE_HOUR || ng >= MAX_PER_10_MIN) return false;
+  c.put(p, String(np + 1), 3600);
+  c.put(g, String(ng + 1), 660);
+  return true;
+}
+
+/** يضيف عناوين الأعمدة الجديدة إلى جدول قديم دون المساس بالموجود */
+function ensureHeaders_(sh) {
+  const head = sh.getRange(1, 1, 1, HEADERS.length).getValues()[0];
+  HEADERS.forEach((h, i) => {
+    if (head[i] === '' || head[i] == null) sh.getRange(1, i + 1).setValue(h).setFontWeight('bold').setBackground('#241c19').setFontColor('#faf6f2');
+  });
+}
+
+/** يعيد حساب المبلغ من أسعار المتجر الحقيقية (shop.json) ويقارنه بما أرسله المتصفح */
+function verify_(d) {
+  try {
+    const cache = CacheService.getScriptCache();
+    let raw = cache.get('shop');
+    if (!raw) {
+      const res = UrlFetchApp.fetch(SHOP_URL + '?t=' + Date.now(), { muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0 (ELORA orders)' } });
+      if (res.getResponseCode() !== 200) return null;
+      raw = res.getContentText();
+      if (raw.length < 95000) cache.put('shop', raw, 300);
+    }
+    const shop = JSON.parse(raw);
+    const P = shop.products || {};
+    let sub = 0, unpriced = false;
+    for (const it of d.items) {
+      const p = P[String(it.key || it.title)] || {};
+      const q = Math.max(1, Math.floor(num_(it.q) || 1));
+      if (!Number.isFinite(p.price)) { unpriced = true; continue; }
+      let u = p.price;
+      (p.bulk || []).forEach((b) => { if (q >= b.min && b.price < u) u = b.price; });
+      sub += u * q;
+    }
+    if (unpriced) return { ok: true, label: 'فيه قطع بلا سعر' };
+    const today = Utilities.formatDate(new Date(), 'Asia/Aden', 'yyyy-MM-dd');
+    let disc = 0;
+    const c = (shop.coupons || {})[String(d.couponCode || '')];
+    if (c && c.active !== false && !(c.expires && c.expires < today) && !(c.min && sub < c.min)) {
+      disc = c.type === 'percent' ? Math.round(sub * c.value / 100) : Math.min(c.value, sub);
+    }
+    if (shop.tiersOn !== false) (shop.tiers || []).forEach((t) => { if (sub >= t.min) disc = Math.max(disc, Math.round(sub * t.pct / 100)); });
+    const zone = (shop.deliveryZones || []).find((z) => z && z.name === d.zone);
+    const free = shop.freeShippingOver > 0 && sub >= shop.freeShippingOver;
+    const ship = zone ? (free ? 0 : zone.fee || 0) : 0;
+    const gw = shop.giftWrap && shop.giftWrap.enabled && d.giftWrap ? (shop.giftWrap.fee || 0) : 0;
+    const total = Math.max(0, sub - disc) + ship + gw;
+    const ok = Math.abs(total - (num_(d.total) || 0)) <= 1;
+    return { ok, total, label: ok ? '✓ مطابق' : '⚠ المبلغ الصحيح: ' + fmt_(total) };
+  } catch (err) {
+    return null;                       // لا نوقف الطلب إن تعذّر التحقق
+  }
+}
+
+function notify_(d, items, count, check) {
   const to = NOTIFY_EMAIL || Session.getEffectiveUser().getEmail();
   if (!to) return;
   const esc = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -191,6 +265,7 @@ function notify_(d, items, count) {
         <table style="width:100%;margin-top:16px;font-size:14px;border-collapse:collapse">
           ${row('عدد القطع', count)}
           ${row('الإجمالي', '<b>' + esc(total) + '</b>')}
+          ${check && !check.ok ? row('تنبيه', '<b style="color:#b3261e">' + esc(check.label) + ' — راجع المبلغ قبل التأكيد</b>') : ''}
           ${row('الدفع', esc(d.payment))}
           ${row('الاسم', esc(d.name))}
           ${row('الجوال', '<span dir="ltr">' + esc(d.phone) + '</span>')}

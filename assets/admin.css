@@ -521,3 +521,9 @@ select { appearance: none; -webkit-appearance: none; background-image: url("data
   .sb-txt { font-size: .8rem; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* متابعة النشر · تنبيهات */
+.banner .spin { width: 16px; height: 16px; flex: none; border-radius: 50%; border: 2px solid currentColor; border-top-color: transparent; animation: spin .9s linear infinite; }
+.banner a { color: inherit; font-weight: 600; text-decoration: underline; }
+.banner small { opacity: .8; }
+.banner.info { background: color-mix(in srgb, var(--gold) 10%, var(--surface)); color: var(--text); border-color: color-mix(in srgb, var(--gold) 30%, transparent); }

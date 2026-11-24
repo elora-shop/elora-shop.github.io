@@ -179,6 +179,7 @@
 
     <!-- الرئيسية -->
     <section class="view" data-view="home">
+      <div id="homeAlerts"></div>
       <div class="hello">
         <div>
           <span class="kicker latin" id="helloKicker">Good day</span>
@@ -284,6 +285,11 @@
           <p class="hint">تظهر للزبون «تُصنع لك يدويًا خلال … أيام». يمكنك تغييرها لأي قطعة من محرر المنتج.</p>
         </div>
         <div class="card">
+          <div class="card-h"><h3><svg class="i"><use href="#i-lock"/></svg> وضع الإجازة</h3><label class="toggle"><input type="checkbox" id="pauseOn"><span></span></label></div>
+          <p class="hint">يوقف استقبال الطلبات مؤقتًا (سفر، ضغط طلبات، مرض). يبقى المتجر ظاهرًا، وتظهر رسالتك أعلاه، ويستطيع الزبون مراسلتك.</p>
+          <label class="fld"><span>رسالة للزبائن</span><input id="pauseText" type="text" maxlength="120" placeholder="نستقبل الطلبات من جديد بعد ١٥ ديسمبر، شكرًا لصبركم"></label>
+        </div>
+        <div class="card">
           <div class="card-h"><h3><svg class="i"><use href="#i-gift"/></svg> تغليف هدية</h3><label class="toggle"><input type="checkbox" id="giftOn"><span></span></label></div>
           <label class="fld"><span>رسوم التغليف</span><span class="inp money"><input id="giftFee" type="text" inputmode="numeric" placeholder="0 = مجاني"><em class="cur"></em></span></label>
           <p class="hint">يستطيع الزبون إضافة رسالة إهداء مع الطلب.</p>
@@ -382,6 +388,13 @@
             <label class="fld"><span>العملة</span><input id="sCur" type="text" maxlength="8" placeholder="ر.ي"></label>
             <label class="fld"><span>الأرقام</span><select id="sDigits"><option value="arab">عربية ١٢٣</option><option value="latn">لاتينية 123</option></select></label>
           </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3><svg class="i"><use href="#i-lock"/></svg> الرابط والأمان</h3></div>
+          <label class="fld"><span>رابط المتجر</span><span class="inp"><svg class="i"><use href="#i-link"/></svg><input id="sSiteUrl" type="url" dir="ltr" placeholder="https://elora-shop.pages.dev/"></span></label>
+          <p class="hint">يُستخدم في صفحات المشاركة وخريطة الموقع لـ Google. غيّره فقط إن اشتريت دومينًا خاصًا.</p>
+          <label class="fld"><span>ينتهي مفتاح الوصول في</span><input id="sTokenExp" type="date"></label>
+          <p class="hint">تظهر لك تنبيهات في الرئيسية قبل انتهائه بشهر، حتى تجدده قبل أن تتوقف اللوحة عن الحفظ.</p>
         </div>
       </div>
     </section>
