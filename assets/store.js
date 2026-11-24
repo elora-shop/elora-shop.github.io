@@ -922,9 +922,9 @@
       } else if (o.channel === 'direct' && o.state === 'fail') {
         body = `<div class="ring warn">${icon('chat')}</div>
           <h2>لم يكتمل الإرسال المباشر</h2><div class="oid">${esc(o.id)}</div>
-          <p>يبدو أن الاتصال ضعيف. طلبك محفوظ، أرسله الآن عبر واتساب بضغطة واحدة.</p>
+          <p>${o.err === 'rate' ? 'وصلتنا طلبات كثيرة متتالية من رقمك، فحوّلنا هذا الطلب إلى واتساب حتى لا يضيع. طلبك محفوظ كاملًا، أرسله بضغطة واحدة.' : 'يبدو أن الاتصال ضعيف. طلبك محفوظ، أرسله الآن عبر واتساب بضغطة واحدة.'}</p>
           <div class="co-actions" style="margin-top:20px">${waBtn('', 'إرسال الطلب عبر واتساب')}</div>
-          <div class="co-actions"><button class="btn btn-ghost btn-lg" id="retryOrder">إعادة المحاولة</button><button class="btn btn-ghost btn-lg" id="copyOrder">${icon('receipt')} نسخ الطلب</button></div>`;
+          <div class="co-actions">${o.err === 'rate' ? '' : '<button class="btn btn-ghost btn-lg" id="retryOrder">إعادة المحاولة</button>'}<button class="btn btn-ghost btn-lg" id="copyOrder">${icon('receipt')} نسخ الطلب</button></div>`;
       } else {
         body = `<div class="ring">${icon('check')}</div>
           <h2>خطوة أخيرة!</h2><div class="oid">${esc(o.id)}</div>
@@ -1175,7 +1175,7 @@
     lastOrder.state = 'sending';
     renderCheckout();
     const started = Date.now();
-    try { await sendToStore(lastOrder.payload); lastOrder.state = 'ok'; } catch { lastOrder.state = 'fail'; }
+    try { await sendToStore(lastOrder.payload); lastOrder.state = 'ok'; } catch (err) { lastOrder.state = 'fail'; lastOrder.err = err && err.message; }
     const o = S.orders.find((x) => x.id === lastOrder.id);
     if (o) { o.sent = lastOrder.state === 'ok'; if (o.sent) o.status = o.status || 'جديد'; save('orders'); }
     setTimeout(() => { if (layers.includes('checkout')) renderCheckout(); }, Math.max(0, 900 - (Date.now() - started)));
