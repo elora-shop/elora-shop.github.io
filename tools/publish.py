@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SITE = "https://elora-shop.github.io/"
+SITE = "https://elora-shop.pages.dev/"
 
 
 def log(msg=""):
