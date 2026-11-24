@@ -224,7 +224,7 @@
       </div>
       <div class="chips" id="prChips"></div>
       <div class="ptable" id="prTable"></div>
-      <p class="hint center">اترك «قبل الخصم» فارغًا إن لم يكن على القطعة خصم · اترك «المخزون» فارغًا إن كانت الكمية مفتوحة · <b>0</b> = نفدت</p>
+      <p class="hint center">اترك «قبل الخصم» فارغًا إن لم يكن على القطعة خصم · «المخزون» = القطع الجاهزة فقط، وفارغ = تُصنع عند الطلب</p>
     </section>
 
     <!-- العروض -->
@@ -240,6 +240,22 @@
           <label class="fld"><span>ينتهي في</span><input id="promoEnds" type="datetime-local"></label>
         </div>
         <div class="promo-preview" id="promoPreview"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">
+          <h3><svg class="i"><use href="#i-gift"/></svg> كلما زاد الطلب زاد الخصم</h3>
+          <label class="toggle"><input type="checkbox" id="tiersOn"><span></span></label>
+        </div>
+        <p class="hint">خصم تلقائي على الطلب كله حسب قيمته، مع شريط في السلة: «أضف … لتحصل على خصم …». لا يُجمع مع الكوبون، ويُطبَّق الأفضل للزبون.</p>
+        <div class="row2" id="tiersBox">
+          <label class="fld"><span>المستوى ١: من</span><span class="inp money"><input data-t="0" data-f="min" type="text" inputmode="numeric"><em class="cur"></em></span></label>
+          <label class="fld"><span>الخصم ٪</span><input data-t="0" data-f="pct" type="text" inputmode="numeric"></label>
+          <label class="fld"><span>المستوى ٢: من</span><span class="inp money"><input data-t="1" data-f="min" type="text" inputmode="numeric"><em class="cur"></em></span></label>
+          <label class="fld"><span>الخصم ٪</span><input data-t="1" data-f="pct" type="text" inputmode="numeric"></label>
+          <label class="fld"><span>المستوى ٣: من</span><span class="inp money"><input data-t="2" data-f="min" type="text" inputmode="numeric"><em class="cur"></em></span></label>
+          <label class="fld"><span>الخصم ٪</span><input data-t="2" data-f="pct" type="text" inputmode="numeric"></label>
+        </div>
       </div>
 
       <div class="sec-h">
@@ -261,6 +277,11 @@
           <div class="card-h"><h3>توصيل مجاني</h3></div>
           <label class="fld"><span>عندما يتجاوز الطلب</span><span class="inp money"><input id="freeOver" type="text" inputmode="numeric" placeholder="0 = إيقاف"><em class="cur"></em></span></label>
           <p class="hint">يظهر للزبون شريط «أضف … لتحصل على توصيل مجاني».</p>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3><svg class="i"><use href="#i-clock"/></svg> الصنع عند الطلب</h3></div>
+          <label class="fld"><span>مدة التجهيز الافتراضية (أيام)</span><input id="makeDays" type="text" inputmode="numeric" placeholder="0 = القطع جاهزة دائمًا"></label>
+          <p class="hint">تظهر للزبون «تُصنع لك يدويًا خلال … أيام». يمكنك تغييرها لأي قطعة من محرر المنتج.</p>
         </div>
         <div class="card">
           <div class="card-h"><h3><svg class="i"><use href="#i-gift"/></svg> تغليف هدية</h3><label class="toggle"><input type="checkbox" id="giftOn"><span></span></label></div>
@@ -413,6 +434,11 @@
           <label class="fld"><span>المخزون <small>(فارغ = مفتوح)</small></span><input id="isStock" type="text" inputmode="numeric" placeholder="∞"></label>
           <div class="fld"><span>السعر يبدأ من</span><label class="toggle-row"><input type="checkbox" id="isFrom"><i></i><small>يظهر «يبدأ من …»</small></label></div>
         </div>
+        <div class="row2">
+          <label class="fld"><span>مدة التجهيز <small>(أيام)</small></span><input id="isPre" type="text" inputmode="numeric" placeholder="الافتراضي"></label>
+          <label class="fld"><span>أسعار الكميات <small>(الكمية:السعر)</small></span><input id="isBulk" type="text" dir="ltr" placeholder="10:1700, 25:1500"></label>
+        </div>
+        <p class="hint"><b>المخزون</b> = عدد القطع الجاهزة للتسليم فورًا، واتركه فارغًا إن كانت تُصنع عند الطلب. <b>مدة التجهيز</b> فارغة = المدة الافتراضية من «التوصيل والدفع». أسعار الكميات تُطبَّق تلقائيًا في السلة.</p>
         <label class="fld"><span>الوصف <small>(اختياري)</small></span><textarea id="isDesc" rows="3" maxlength="300" placeholder="قطعة مصنوعة يدويًا…"></textarea></label>
         <div class="flags">
           <label class="flag"><input type="checkbox" id="isFeat"><span><svg class="i"><use href="#i-star"/></svg> مميّزة في الواجهة</span></label>

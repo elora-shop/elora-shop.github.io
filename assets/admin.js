@@ -196,6 +196,17 @@
 
   /* ═══════════ بيانات المنتجات في shop.json ═══════════ */
   const getP = (it) => (SHOP.products[it.title] || SHOP.products[it.id] || {});
+  // مدة التجهيز للقطعة (أيام): الخاصة بها أو الافتراضية من «التوصيل والدفع»
+  const leadOf = (p) => p.days || (Number(SHOP.makeDays) > 0 ? Number(SHOP.makeDays) : 0);
+  const bulkTxt = (b) => (Array.isArray(b) ? b.map((x) => `${x.min}:${x.price}`).join(', ') : '');
+  const parseBulk = (s) => {
+    const out = [];
+    String(s || '').replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).split(/[,،\n]+/).forEach((part) => {
+      const m = part.match(/(\d+)\s*[:=×x]\s*(\d+)/);
+      if (m && +m[1] > 1 && +m[2] > 0) out.push({ min: +m[1], price: +m[2] });
+    });
+    return out.length ? out.sort((a, b) => a.min - b.min) : null;
+  };
   function setP(it, patch, silent) {
     const cur = { ...getP(it), ...patch };
     for (const k of Object.keys(cur)) if (cur[k] === null || cur[k] === undefined || cur[k] === '' || cur[k] === false || Number.isNaN(cur[k])) delete cur[k];
@@ -255,7 +266,7 @@
     return true;
   }
   function summarize(kinds) {
-    const m = { p: 'الأسعار والمنتجات', c: 'الكوبونات', promo: 'شريط العرض', ship: 'التوصيل والدفع', front: 'واجهة المتجر', orders: 'إعدادات الطلبات', site: 'إعدادات المتجر' };
+    const m = { p: 'الأسعار والمنتجات', c: 'الكوبونات', promo: 'شريط العرض', tiers: 'خصم الكمية', ship: 'التوصيل والدفع', front: 'واجهة المتجر', orders: 'إعدادات الطلبات', site: 'إعدادات المتجر' };
     const parts = [...new Set(kinds)].map((k) => m[k]).filter(Boolean);
     return 'لوحة التحكم: تحديث ' + (parts.join('، ') || 'المتجر');
   }
@@ -340,8 +351,8 @@
     const ps = ITEMS.map((it) => ({ it, p: getP(it) }));
     const priced = ps.filter((x) => x.p.price != null).length;
     const sale = ps.filter((x) => isSale(x.p)).length;
-    const out = ps.filter((x) => x.p.stock === 0).length;
-    const low = ps.filter((x) => x.p.stock > 0 && x.p.stock <= 2).length;
+    const out = ps.filter((x) => x.p.stock === 0 && !leadOf(x.p)).length;
+    const low = ps.filter((x) => x.p.stock > 0 && x.p.stock <= 2 && !leadOf(x.p)).length;
     const now = new Date().toISOString().slice(0, 10);
     const coupons = Object.values(SHOP.coupons || {}).filter((c) => c.active !== false && !(c.expires && c.expires < now)).length;
     $('#helloSub').textContent = priced < ITEMS.length ? `${plural(ITEMS.length - priced, 'قطعة', 'قطع', 'قطعة')} بانتظار التسعير.` : 'كل القطع مسعّرة، متجرك جاهز للبيع ✦';
@@ -394,7 +405,8 @@
         it.pending && '<span class="pb pend">قيد النشر</span>',
         p.hidden && '<span class="pb hid">مخفية</span>',
         isSale(p) && `<span class="pb sale">−${num(discPct(p))}٪</span>`,
-        p.stock === 0 && '<span class="pb out">نفدت</span>',
+        p.stock === 0 && !leadOf(p) && '<span class="pb out">نفدت</span>',
+        p.stock > 0 && leadOf(p) && `<span class="pb">${num(p.stock)} جاهزة</span>`,
         it.type === 'video' && '<span class="pb">فيديو</span>',
       ].filter(Boolean).join('');
       return `<button class="pcard${p.hidden ? ' hidden-item' : ''}" data-i="${ITEMS.indexOf(it)}">
@@ -518,6 +530,9 @@
     $('#isOld').value = p.oldPrice ?? '';
     $('#isStock').value = p.stock ?? '';
     $('#isFrom').checked = !!p.from;
+    $('#isPre').value = p.days ?? '';
+    $('#isPre').placeholder = Number(SHOP.makeDays) > 0 ? `الافتراضي ${num(SHOP.makeDays)}` : 'جاهزة';
+    $('#isBulk').value = bulkTxt(p.bulk);
     $('#isDesc').value = p.desc || '';
     $('#isFeat').checked = !!p.featured;
     $('#isHidden').checked = !!p.hidden;
@@ -534,8 +549,12 @@
       h += `<b>${from ? 'يبدأ من ' : ''}${money(price)}</b>`;
       if (old != null && old > price) h += ` <s>${money(old)}</s> <span class="disc">خصم ${num(Math.round(100 - price / old * 100))}٪</span>`;
     }
-    if (stock === 0) h += ' · <b style="color:var(--sale)">نفدت الكمية</b>';
+    const lead = toNum($('#isPre').value) || (Number(SHOP.makeDays) > 0 ? Number(SHOP.makeDays) : 0);
+    if (lead) h += stock > 0 ? ` · <span style="color:var(--ok)">${num(stock)} جاهزة الآن</span>` : ` · <span style="color:var(--gold)">تُصنع خلال ${num(lead)} أيام</span>`;
+    else if (stock === 0) h += ' · <b style="color:var(--sale)">نفدت الكمية</b>';
     else if (stock != null && stock <= 2) h += ` · <span style="color:var(--gold)">${stock === 1 ? 'آخر قطعة' : 'كمية محدودة'}</span>`;
+    const bk = parseBulk($('#isBulk').value);
+    if (bk) h += ` · <small>${bk.map((b) => `${num(b.min)}+ بـ ${money(b.price)}`).join('، ')}</small>`;
     if ($('#isHidden').checked) h += ' · <span style="color:var(--muted)">مخفية</span>';
     $('#isPreview').innerHTML = h;
   }
@@ -569,7 +588,7 @@
       const e = (SHOP.products[it.title] ||= {});
       e.aliases = [...new Set([...(e.aliases || []), shortId(oldId)])].filter((a) => a !== shortId(it.id));
     }
-    setP(it, { price, oldPrice: old, stock: toNum($('#isStock').value), from: $('#isFrom').checked, desc: $('#isDesc').value.trim(), featured: $('#isFeat').checked, hidden: $('#isHidden').checked });
+    setP(it, { price, oldPrice: old, stock: toNum($('#isStock').value), days: toNum($('#isPre').value) || null, bulk: parseBulk($('#isBulk').value), from: $('#isFrom').checked, desc: $('#isDesc').value.trim(), featured: $('#isFeat').checked, hidden: $('#isHidden').checked });
     closeSheet('itemSheet');
     try {
       busy('جارٍ الحفظ…');
@@ -702,6 +721,8 @@
     $('#promoText').value = pr.text || '';
     $('#promoEnds').value = pr.ends ? pr.ends.slice(0, 16) : '';
     renderPromoPreview();
+    $('#tiersOn').checked = SHOP.tiersOn !== false && (SHOP.tiers || []).length > 0;
+    $$('#tiersBox [data-t]').forEach((inp) => { const t = (SHOP.tiers || [])[+inp.dataset.t]; inp.value = t ? t[inp.dataset.f] : ''; });
     const now = new Date().toISOString().slice(0, 10);
     const list = Object.entries(SHOP.coupons || {});
     $('#coupons').innerHTML = list.map(([code, c]) => {
@@ -744,6 +765,15 @@
     markDirty('promo');
     renderPromoPreview();
   }));
+  function readTiers() {
+    const rows = [0, 1, 2].map((i) => ({ min: toNum($(`#tiersBox [data-t="${i}"][data-f="min"]`).value), pct: toNum($(`#tiersBox [data-t="${i}"][data-f="pct"]`).value) }))
+      .filter((t) => t.min > 0 && t.pct > 0 && t.pct < 100).sort((a, b) => a.min - b.min);
+    SHOP.tiers = rows;
+    SHOP.tiersOn = $('#tiersOn').checked;
+    markDirty('tiers');
+  }
+  $('#tiersOn').addEventListener('input', readTiers);
+  $('#tiersBox').addEventListener('input', readTiers);
   $('#coupons').addEventListener('click', async (e) => {
     if (e.target.closest('#newCouponTile')) { openCoupon(null); return; }
     const b = e.target.closest('[data-cp]');
@@ -834,6 +864,7 @@
       <button class="icon-btn" data-zdel="${i}" aria-label="حذف">${icon('trash')}</button></div>`).join('')
       : '<p class="zone-empty">لا توجد مناطق بعد. أضف منطقة مثل «داخل المدينة».</p>';
     $('#freeOver').value = SHOP.freeShippingOver || '';
+    $('#makeDays').value = SHOP.makeDays || '';
     $('#giftOn').checked = !!SHOP.giftWrap?.enabled;
     $('#giftFee').value = SHOP.giftWrap?.fee || '';
     const pays = SHOP.payments || [];
@@ -850,6 +881,7 @@
   });
   $('#zones').addEventListener('click', (e) => { const b = e.target.closest('[data-zdel]'); if (b) { SHOP.deliveryZones.splice(+b.dataset.zdel, 1); markDirty('ship'); renderShipping(); } });
   $('#freeOver').addEventListener('input', (e) => { SHOP.freeShippingOver = toNum(e.target.value) || 0; markDirty('ship'); });
+  $('#makeDays').addEventListener('input', (e) => { SHOP.makeDays = toNum(e.target.value) || 0; markDirty('ship'); });
   ['giftOn', 'giftFee'].forEach((id) => $('#' + id).addEventListener('input', () => { SHOP.giftWrap = { enabled: $('#giftOn').checked, fee: toNum($('#giftFee').value) || 0 }; markDirty('ship'); }));
   function addPay(p) { p = p.trim(); if (!p) return; SHOP.payments ||= []; if (!SHOP.payments.includes(p)) SHOP.payments.push(p); markDirty('ship'); renderShipping(); }
   $('#payAdd').addEventListener('submit', (e) => { e.preventDefault(); const i = e.target.querySelector('input'); addPay(i.value); i.value = ''; });

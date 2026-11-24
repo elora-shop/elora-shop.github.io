@@ -777,3 +777,15 @@ main:has(> .insta[hidden]) + .ftr { margin-top: 110px; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
   .card.reveal { opacity: 1; transform: none; }
 }
+
+/* حجز مسبق · أسعار الكميات · خصم الكمية */
+.badge.pre { background: var(--gold); color: var(--bg); }
+.line-hint { display: block; margin-top: 4px; font-size: .76rem; color: var(--gold); line-height: 1.5; }
+.tier-bar { margin-top: 10px; }
+.tier-bar .i { color: var(--rose); }
+.bulk-box { border: 1px dashed var(--border); border-radius: var(--r); padding: 12px 14px; font-size: .86rem; }
+.bulk-box > b { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 8px; }
+.bulk-box .i { width: 16px; height: 16px; color: var(--gold); }
+.bulk-box > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.bulk-box span { display: grid; gap: 2px; padding: 6px 12px; border-radius: 10px; background: var(--surface); text-align: center; }
+.bulk-box small { color: var(--muted); font-size: .74rem; }

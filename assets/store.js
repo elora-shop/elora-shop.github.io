@@ -76,6 +76,10 @@
           stock: Number.isFinite(extra.stock) ? extra.stock : null,
           desc: extra.desc || '', featured: !!extra.featured, hidden: !!extra.hidden, from: !!extra.from,
           aliases: Array.isArray(extra.aliases) ? extra.aliases : [],
+          // مدة التجهيز بالأيام لهذه القطعة (٠ = يُستخدم الافتراضي SHOP.makeDays)
+          days: Number.isFinite(extra.days) && extra.days > 0 ? extra.days : 0,
+          // أسعار الكميات: [{min: 10, price: 1700}]
+          bulk: Array.isArray(extra.bulk) ? extra.bulk.filter((b) => b && b.min > 1 && Number.isFinite(b.price)).sort((a, b) => a.min - b.min) : [],
         };
         p.key = norm(`${p.title} ${p.cat} ${p.desc}`);
         return p;
@@ -99,8 +103,24 @@
   }
 
   const isNew = (p) => p.added && Date.now() - p.added < (SHOP.newDays || 14) * 864e5;
-  const soldOut = (p) => p.stock === 0;
-  const canAdd = (p, extra = 1) => !soldOut(p) && (p.stock == null || (S.cart[p.id] || 0) + extra <= p.stock);
+  /* المخزون: القطع تُصنع عند الطلب افتراضيًا (مدة تجهيز بالأيام)،
+     والرقم في «المخزون» = قطع جاهزة للتسليم فورًا. 0 بلا مدة تجهيز = نفدت. */
+  const lead = (p) => p.days || (Number(SHOP.makeDays) > 0 ? Number(SHOP.makeDays) : 0);
+  const daysTxt = (d) => (d === 1 ? 'يوم واحد' : d === 2 ? 'يومين' : d <= 10 ? `${num(d)} أيام` : `${num(d)} يومًا`);
+  const madeToOrder = (p) => lead(p) > 0;
+  const ready = (p, q = 1) => p.stock != null && p.stock >= q;     // تُسلَّم فورًا من الجاهز
+  const booking = (p) => p.stock === 0 && madeToOrder(p);          // لا جاهز، تُصنع بعد الحجز
+  const soldOut = (p) => p.stock === 0 && !madeToOrder(p);
+  const cap = (p) => (madeToOrder(p) ? null : p.stock);             // الحد الأقصى للكمية (null = مفتوح)
+  const canAdd = (p, extra = 1) => !soldOut(p) && (cap(p) == null || (S.cart[p.id] || 0) + extra <= cap(p));
+  const unitPrice = (p, q) => {
+    if (p.price == null) return null;
+    let u = p.price;
+    for (const b of p.bulk) if (q >= b.min && b.price < u) u = b.price;
+    return u;
+  };
+  // كلما زاد الطلب زاد الخصم: [{min: 20000, pct: 5}]
+  const tiers = () => (SHOP.tiersOn === false ? [] : (SHOP.tiers || []).filter((x) => x && x.min > 0 && x.pct > 0).sort((a, b) => a.min - b.min));
   // رابط قصير وثابت لكل قطعة: …/elora/#i=k3f9a2 بدل اسم عربي طويل مشفّر
   const shortId = (s) => { let h = 0x811c9dc5; for (const ch of String(s)) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
   const BYSID = new Map();
@@ -126,9 +146,10 @@
     const b = [];
     if (soldOut(p)) b.push('<span class="badge out">نفدت الكمية</span>');
     else {
+      if (madeToOrder(p) && p.stock > 0) b.push('<span class="badge pre">جاهزة الآن</span>');
       if (p.oldPrice && p.price != null && p.oldPrice > p.price) b.push(`<span class="badge sale">خصم ${num(Math.round(100 - (p.price / p.oldPrice) * 100))}٪</span>`);
       if (isNew(p)) b.push('<span class="badge new">جديد</span>');
-      if (p.stock != null && p.stock > 0 && p.stock <= 2) b.push(`<span class="badge low">${p.stock === 1 ? 'آخر قطعة' : 'كمية محدودة'}</span>`);
+      if (!madeToOrder(p) && p.stock != null && p.stock > 0 && p.stock <= 2) b.push(`<span class="badge low">${p.stock === 1 ? 'آخر قطعة' : 'كمية محدودة'}</span>`);
     }
     return b.length ? `<div class="badges">${b.join('')}</div>` : '';
   }
@@ -308,7 +329,7 @@
         itemListElement: ITEMS.slice(0, 50).map((p) => ({
           '@type': 'Offer', itemOffered: { '@type': 'Product', name: p.title, image: p.img, category: p.cat },
           ...(p.price != null && !SHOP.sampleData ? { price: p.price, priceCurrency: SHOP.currencyCode || 'YER' } : {}),
-          availability: soldOut(p) ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
+          availability: soldOut(p) ? 'https://schema.org/OutOfStock' : madeToOrder(p) && !(p.stock > 0) ? 'https://schema.org/MadeToOrder' : 'https://schema.org/InStock',
         })),
       },
     };
@@ -472,7 +493,7 @@
     const p = BY.get(id);
     if (!p) return false;
     if (!canAdd(p, qty)) {
-      toast(soldOut(p) ? 'هذه القطعة نفدت حاليًا' : `المتوفر من هذه القطعة ${num(p.stock)} فقط`);
+      toast(soldOut(p) ? 'هذه القطعة نفدت حاليًا' : `المتوفر من هذه القطعة ${num(cap(p))} فقط`);
       return false;
     }
     S.cart[id] = (S.cart[id] || 0) + qty;
@@ -487,14 +508,15 @@
     const p = BY.get(id);
     if (!p) return;
     if (q <= 0) delete S.cart[id];
-    else S.cart[id] = p.stock != null ? Math.min(q, p.stock) : q;
+    else S.cart[id] = cap(p) != null ? Math.min(q, cap(p)) : q;
     save('cart'); updateCounts(); renderDrawer();
   }
 
   function zones() { return (SHOP.deliveryZones || []).filter((z) => z && z.name); }
   function totals() {
     const lines = Object.entries(S.cart).map(([id, q]) => ({ p: BY.get(id), q })).filter((l) => l.p);
-    const sub = lines.reduce((s, l) => s + (l.p.price != null ? l.p.price * l.q : 0), 0);
+    lines.forEach((l) => { l.u = unitPrice(l.p, l.q); });
+    const sub = lines.reduce((s, l) => s + (l.u != null ? l.u * l.q : 0), 0);
     const unpriced = lines.some((l) => l.p.price == null);
     let discount = 0, couponMsg = '', couponOk = false;
     const c = S.coupon && (SHOP.coupons || {})[S.coupon];
@@ -508,12 +530,21 @@
         couponOk = true; couponMsg = `تم تطبيق ${c.label || S.coupon}`;
       }
     }
+    // خصم الكمية لا يُجمع مع الكوبون: يُطبَّق الأفضل للزبون
+    let discLabel = discount ? `كوبون ${S.coupon}` : '';
+    const tier = tiers().filter((x) => sub >= x.min).pop() || null;
+    const nextTier = tiers().find((x) => sub < x.min) || null;
+    const tierDisc = tier ? Math.round(sub * tier.pct / 100) : 0;
+    if (tierDisc > discount) {
+      if (couponOk) couponMsg = `خصم الكمية (${num(tier.pct)}٪) أفضل لك من الكوبون، فطبّقناه بدلًا منه`;
+      discount = tierDisc; discLabel = `خصم الكمية ${num(tier.pct)}٪`;
+    }
     const zone = zones().find((z) => z.name === S.zone);
     const free = SHOP.freeShippingOver > 0 && sub >= SHOP.freeShippingOver;
     const ship = zone ? (free ? 0 : zone.fee || 0) : null;
     const gw = SHOP.giftWrap && SHOP.giftWrap.enabled && S.gift.on ? (SHOP.giftWrap.fee || 0) : 0;
     const total = Math.max(0, sub - discount) + (ship || 0) + gw;
-    return { lines, count: cartCount(), sub, unpriced, discount, couponMsg, couponOk, zone, free, ship, gw, total };
+    return { lines, count: cartCount(), sub, unpriced, discount, discLabel, tier, nextTier, couponMsg, couponOk, zone, free, ship, gw, total };
   }
 
   /* ================= الدرج الجانبي ================= */
@@ -565,20 +596,27 @@
   function closeMenu() { if (layers.includes('menu')) { closeLayer('menu', $('#menu')); hideScrimIfIdle(); } }
 
   function lineHTML(p, q) {
+    const u = unitPrice(p, q);
+    const nb = p.bulk.find((b) => q < b.min);
+    const hints = [];
+    if (ready(p, q)) { if (madeToOrder(p)) hints.push('جاهزة للتسليم'); }
+    else if (madeToOrder(p)) hints.push(`تُصنع لك خلال ${daysTxt(lead(p))}`);
+    if (u != null && u < p.price) hints.push(`سعر الكمية: ${money(u)} للقطعة`);
+    if (nb) hints.push(`اطلب ${num(nb.min)} أو أكثر: ${money(nb.price)} للقطعة`);
     return `<div class="line">
       <div class="line-img" data-open="${esc(p.id)}"><img src="${esc(p.thumb)}" alt="" loading="lazy"></div>
       <div>
         <div class="line-top">
-          <div><div class="line-name" data-open="${esc(p.id)}">${esc(p.title)}</div><div class="line-cat">${esc(p.cat)}</div></div>
+          <div><div class="line-name" data-open="${esc(p.id)}">${esc(p.title)}</div><div class="line-cat">${esc(p.cat)}</div>${hints.map((h) => `<small class="line-hint">${h}</small>`).join('')}</div>
           <button class="rm" data-rm="${esc(p.id)}" aria-label="حذف ${esc(p.title)}">${icon('trash')}</button>
         </div>
         <div class="line-bottom">
           <div class="stepper" role="group" aria-label="الكمية">
-            <button data-qty="${esc(p.id)}" data-d="1" aria-label="زيادة" ${p.stock != null && q >= p.stock ? 'disabled' : ''}>${icon('plus')}</button>
+            <button data-qty="${esc(p.id)}" data-d="1" aria-label="زيادة" ${cap(p) != null && q >= cap(p) ? 'disabled' : ''}>${icon('plus')}</button>
             <output>${num(q)}</output>
             <button data-qty="${esc(p.id)}" data-d="-1" aria-label="إنقاص">${icon('minus')}</button>
           </div>
-          ${p.price != null ? `<b>${money(p.price * q)}</b>` : '<span class="price"><span class="ask">عند الطلب</span></span>'}
+          ${u != null ? `<b>${money(u * q)}</b>` : '<span class="price"><span class="ask">عند الطلب</span></span>'}
         </div>
       </div>
     </div>`;
@@ -587,7 +625,7 @@
   function summaryHTML(t, { withZone = false } = {}) {
     const anyPriced = t.lines.some((l) => l.p.price != null);
     const rows = anyPriced ? [`<div class="sum-row"><span>المجموع${t.unpriced ? ' (للقطع المسعّرة)' : ''}</span><span>${money(t.sub)}</span></div>`] : [];
-    if (t.discount) rows.push(`<div class="sum-row disc"><span>الخصم · <bdi dir="ltr">${esc(S.coupon)}</bdi></span><span>− ${money(t.discount)}</span></div>`);
+    if (t.discount) rows.push(`<div class="sum-row disc"><span>الخصم · <bdi>${esc(t.discLabel)}</bdi></span><span>− ${money(t.discount)}</span></div>`);
     if (t.gw) rows.push(`<div class="sum-row"><span>تغليف الهدية</span><span>${money(t.gw)}</span></div>`);
     if ((withZone && zones().length) || t.zone) {
       rows.push(`<div class="sum-row"><span>التوصيل${t.zone ? ` (${esc(t.zone.name)})` : ''}</span><span>${t.ship == null ? 'يُحدَّد في الخطوة التالية' : t.ship === 0 ? 'مجاني' : money(t.ship)}</span></div>`);
@@ -625,6 +663,17 @@
         const left = SHOP.freeShippingOver - t.sub;
         const pct = Math.min(100, (t.sub / SHOP.freeShippingOver) * 100);
         bar = `<div class="ship-bar${left <= 0 ? ' done' : ''}">${icon('truck')} ${left <= 0 ? 'رائع! حصلت على <b>توصيل مجاني</b>' : `أضف ${money(left)} لتحصل على <b>توصيل مجاني</b>`}<div class="track"><div class="fill" style="width:${pct}%"></div></div></div>`;
+      }
+      // الشريط يعرض المستوى التالي الذي يعطي خصمًا أكبر مما حصل عليه الزبون فعلًا (كوبون أو كمية)
+      const curPct = t.sub ? (t.discount / t.sub) * 100 : 0;
+      const nx = tiers().find((x) => t.sub < x.min && x.pct > curPct + 0.01) || null;
+      const top = tiers()[tiers().length - 1];
+      const atTop = !nx && t.tier && t.tier === top && t.discLabel.startsWith('خصم الكمية');
+      if (tiers().length && !t.unpriced && (nx || atTop)) {
+        const pct = nx ? Math.min(100, (t.sub / nx.min) * 100) : 100;
+        bar += `<div class="ship-bar tier-bar${nx ? '' : ' done'}">${icon('gift')} ${nx
+          ? `أضف ${money(nx.min - t.sub)} لتحصل على <b>خصم ${num(nx.pct)}٪</b> على طلبك كله`
+          : `رائع! حصلت على <b>أعلى خصم ${num(top.pct)}٪</b> على طلبك`}<div class="track"><div class="fill" style="width:${pct}%"></div></div></div>`;
       }
       const gw = SHOP.giftWrap && SHOP.giftWrap.enabled;
       body.innerHTML = bar + t.lines.map((l) => lineHTML(l.p, l.q)).join('') + `
@@ -708,6 +757,9 @@
     const more = related.length < 4 ? ITEMS.filter((x) => x.cat !== p.cat && x.featured).slice(0, 8 - related.length) : [];
     const wished = S.wish.includes(p.id);
     const stock = soldOut(p) ? '<span class="stock-line out">نفدت الكمية حاليًا</span>'
+      : madeToOrder(p) ? (p.stock > 0
+        ? `<span class="stock-line">${p.stock === 1 ? 'قطعة واحدة جاهزة للتسليم الآن' : `${num(p.stock)} قطع جاهزة للتسليم الآن`}، وما زاد يُصنع خلال ${daysTxt(lead(p))}</span>`
+        : `<span class="stock-line low">تُصنع لك يدويًا خلال ${daysTxt(lead(p))} من تأكيد الطلب</span>`)
       : p.stock != null && p.stock <= 2 ? `<span class="stock-line low">${p.stock === 1 ? 'آخر قطعة متبقية' : `متبقٍ ${num(p.stock)} قطع فقط`}</span>`
       : '<span class="stock-line">متوفرة وجاهزة للطلب</span>';
     const askText = `${CFG.whatsappMessage || 'السلام عليكم، أود الاستفسار عن هذه القطعة'}\n\n${p.title}\n${productLink(p)}`;
@@ -726,6 +778,7 @@
           <h2>${esc(p.title)}</h2>
           ${priceHTML(p)}
           ${stock}
+          ${p.bulk.length && p.price != null ? `<div class="bulk-box"><b>${icon('gift')} أسعار الكميات</b><div>${[{ min: 1, price: p.price }, ...p.bulk].map((b, i, a) => `<span><small>${a[i + 1] ? `${num(b.min)}–${num(a[i + 1].min - 1)}` : `${num(b.min)} فأكثر`}</small>${money(b.price)}</span>`).join('')}</div></div>` : ''}
           <p class="sheet-desc">${esc(p.desc || `قطعة من تشكيلة ${p.cat} في ${CFG.brandName || 'ELORA'}، مصنوعة يدويًا بعناية وتفاصيل دقيقة.`)}</p>
           ${soldOut(p) ? `
             ${waLink() ? `<a class="btn btn-lg btn-block" target="_blank" rel="noopener" href="${esc(waLink(`السلام عليكم، أود أن تخبروني عند توفر: ${p.title}\n${productLink(p)}`))}">${icon('chat')} أبلغني عند التوفر</a>` : ''}`
@@ -733,7 +786,7 @@
               <div class="stepper lg" role="group" aria-label="الكمية">
                 <button data-sq="1" aria-label="زيادة">${icon('plus')}</button><output id="sq">${num(1)}</output><button data-sq="-1" aria-label="إنقاص">${icon('minus')}</button>
               </div>
-              <button class="btn" data-sheet-add>${icon('bag')} أضف للسلة</button>
+              <button class="btn" data-sheet-add>${icon('bag')} ${booking(p) ? 'احجزها الآن' : 'أضف للسلة'}</button>
             </div>
             <button class="btn btn-rose btn-lg btn-block" data-buy-now>اشترِ الآن</button>`}
           <div class="sub-actions">
@@ -744,6 +797,7 @@
           <ul class="assure">
             <li>${icon('sparkle')} مصنوعة يدويًا، وقد تختلف تفاصيل بسيطة من قطعة لأخرى</li>
             <li>${icon('chat')} نؤكد طلبك ونتفق على التوصيل عبر واتساب</li>
+            ${tiers().length ? `<li>${icon('gift')} كلما زاد طلبك زاد خصمك: ${tiers().map((x) => `${num(x.pct)}٪ من ${money(x.min)}`).join(' · ')}</li>` : ''}
             ${SHOP.giftWrap && SHOP.giftWrap.enabled ? `<li>${icon('gift')} تغليف هدية متاح عند الطلب</li>` : ''}
           </ul>
         </div>
@@ -993,17 +1047,18 @@
     t.lines.forEach((l, i) => {
       L.push('');
       L.push(`*${num(i + 1)}. ${l.p.title}*`);
-      if (l.p.price == null) {
+      if (l.u == null) {
         L.push(`الكمية: ${num(l.q)}  ·  السعر يُحدَّد عند التأكيد`);
       } else {
-        const unit = `${l.p.from ? 'يبدأ من ' : ''}${money(l.p.price)}`;
+        const unit = `${l.p.from ? 'يبدأ من ' : ''}${money(l.u)}${l.u < l.p.price ? ' (سعر الكمية)' : ''}`;
         if (l.q > 1) {
           L.push(`الكمية: ${num(l.q)}  ·  سعر القطعة: ${unit}`);
-          L.push(`المجموع: *${money(l.p.price * l.q)}*`);
+          L.push(`المجموع: *${money(l.u * l.q)}*`);
         } else {
           L.push(`الكمية: ${num(l.q)}  ·  السعر: ${unit}`);
         }
       }
+      if (madeToOrder(l.p)) L.push(ready(l.p, l.q) ? '_جاهزة للتسليم_' : `_تُصنع خلال ${daysTxt(lead(l.p))}_`);
       L.push(productLink(l.p));
     });
 
@@ -1016,7 +1071,7 @@
       if (t.gw) L.push(`تغليف الهدية: ${money(t.gw)}`);
     } else {
       L.push(`المجموع${t.unpriced ? ' (للقطع المسعّرة)' : ''}: ${money(t.sub)}`);
-      if (t.discount) L.push(`الخصم: − ${money(t.discount)}  (كوبون ${S.coupon})`);
+      if (t.discount) L.push(`الخصم: − ${money(t.discount)}  (${t.discLabel})`);
       if (t.gw) L.push(`تغليف الهدية: ${money(t.gw)}`);
       if (t.zone) L.push(`التوصيل (${t.zone.name}): ${t.ship === 0 ? 'مجاني ✓' : money(t.ship)}`);
       L.push(`*الإجمالي${t.unpriced ? ' المبدئي' : ' المستحق'}: ${money(t.total)}*`);
@@ -1024,6 +1079,8 @@
       if (priced.some((l) => l.p.from)) L.push('_بعض الأسعار تبدأ من القيمة المذكورة_');
     }
     if (S.payment) L.push(`طريقة الدفع: ${S.payment}`);
+    const make = Math.max(0, ...t.lines.filter((l) => madeToOrder(l.p) && !ready(l.p, l.q)).map((l) => lead(l.p)));
+    if (make) L.push(`مدة التجهيز المتوقعة: ${daysTxt(make)} من تأكيد الطلب`);
 
     // التوصيل
     L.push(SEP);
@@ -1080,8 +1137,8 @@
     return {
       id, at: at.toISOString(), channel: ch,
       name: c.name, phone: latinDigits(c.phone), zone: S.zone || '', city: c.city || '', address: c.address || '', notes: c.notes || '',
-      items: t.lines.map((l) => ({ title: l.p.title, q: l.q, price: l.p.price, from: l.p.from, link: productLink(l.p) })),
-      sub: t.sub, discount: t.discount, coupon: t.discount ? S.coupon : '', ship: t.ship,
+      items: t.lines.map((l) => ({ title: l.p.title + (madeToOrder(l.p) ? (ready(l.p, l.q) ? ' (جاهزة)' : ` (تُصنع خلال ${lead(l.p)} أيام)`) : ''), q: l.q, price: l.u, from: l.p.from, link: productLink(l.p) })),
+      sub: t.sub, discount: t.discount, coupon: t.discount ? t.discLabel : '', ship: t.ship,
       giftWrap: !!S.gift.on, giftWrapFee: t.gw, giftNote: S.gift.on ? S.gift.note : '',
       total: t.total, unpriced: t.unpriced, payment: S.payment || '',
       website: ($('#hp') || {}).value || '',
@@ -1250,7 +1307,7 @@
     if ((b = el('[data-step]'))) { stepSheet(Number(b.dataset.step)); return; }
     if ((b = el('[data-sq]'))) {
       const p = BY.get(sheetId);
-      const max = p && p.stock != null ? Math.max(1, p.stock - (S.cart[p.id] || 0)) : 99;
+      const max = p && cap(p) != null ? Math.max(1, cap(p) - (S.cart[p.id] || 0)) : 99;
       sheetQty = Math.min(max, Math.max(1, sheetQty + Number(b.dataset.sq)));
       $('#sq').textContent = num(sheetQty);
       return;
@@ -1278,7 +1335,7 @@
       const o = S.orders[Number(b.dataset.reorder)];
       if (!o) return;
       let n = 0;
-      o.items.forEach((it) => { const p = BY.get(it.id); if (p && !soldOut(p)) { S.cart[it.id] = p.stock != null ? Math.min(it.q, p.stock) : it.q; n++; } });
+      o.items.forEach((it) => { const p = BY.get(it.id); if (p && !soldOut(p)) { S.cart[it.id] = cap(p) != null ? Math.min(it.q, cap(p)) : it.q; n++; } });
       save('cart'); updateCounts('cart');
       if (n) openDrawer('cart'); else toast('القطع في هذا الطلب غير متوفرة حاليًا');
       return;
