@@ -996,17 +996,18 @@
   /* ═══════════ الطلبات ═══════════ */
   function renderOrders() {
     $('#orderEp').value = SHOP.orderEndpoint || '';
-    $('#sheetUrl').value = SHOP._admin?.ordersSheet || '';
-    const sheet = SHOP._admin?.ordersSheet;
-    $('#openSheet').hidden = !sheet;
-    if (sheet) $('#openSheet').href = sheet;
+    // رابط الجدول يُحفظ على هذا الجهاز فقط (لا يُنشر في ملفات المتجر العامة)
+    if (SHOP._admin?.ordersSheet && !store.get('elora-sheet', '')) store.set('elora-sheet', SHOP._admin.ordersSheet);
+    if (SHOP._admin) { delete SHOP._admin; markDirty('orders'); }
+    $('#sheetUrl').value = store.get('elora-sheet', '');
+    renderOrdersLink();
     const st = $('#epStatus');
     st.className = 'status-dot' + (SHOP.orderEndpoint ? '' : ' bad');
     st.textContent = SHOP.orderEndpoint ? 'غير مختبر' : 'غير مربوط';
   }
   $('#orderEp').addEventListener('input', (e) => { SHOP.orderEndpoint = e.target.value.trim(); markDirty('orders'); });
-  $('#sheetUrl').addEventListener('input', (e) => { (SHOP._admin ||= {}).ordersSheet = e.target.value.trim(); markDirty('orders'); renderOrdersLink(); });
-  function renderOrdersLink() { const s = SHOP._admin?.ordersSheet; $('#openSheet').hidden = !s; if (s) $('#openSheet').href = s; }
+  $('#sheetUrl').addEventListener('input', (e) => { const v = e.target.value.trim(); store.set('elora-sheet', /^https:\/\/docs\.google\.com\//.test(v) ? v : ''); renderOrdersLink(); });
+  function renderOrdersLink() { const s = store.get('elora-sheet', ''); $('#openSheet').hidden = !s; if (s) $('#openSheet').href = s; }
   async function pingEndpoint(ids) {
     const u = $('#orderEp').value.trim();
     if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(u)) throw new Error('الرابط يجب أن يكون رابط Web app من Google');
