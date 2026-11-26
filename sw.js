@@ -1,8 +1,9 @@
 /* ELORA — يجعل المتجر يفتح بسرعة ويعمل حتى مع ضعف الإنترنت.
  * الصفحة والبيانات: من الشبكة أولًا (حتى تظهر تحديثاتك فورًا)، ومن الذاكرة عند انقطاع الاتصال.
  * الصور: من الذاكرة فورًا، مع تحديثها في الخلفية.
+ * ملفات البيانات (.json) تُحفظ نسخة واحدة لكل ملف (أحدثها)، لا نسخة لكل زيارة.
  */
-const CACHE = 'elora-v1';
+const CACHE = 'elora-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -29,12 +30,23 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // البيانات: مفتاح ثابت بلا ?v= حتى يكون المحفوظ دائمًا آخر نسخة نجح تحميلها
+  if (/\.json$/i.test(u.pathname)) {
+    const key = u.origin + u.pathname;
+    e.respondWith(
+      fetch(req)
+        .then((res) => { if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(key, copy)); } return res; })
+        .catch(() => caches.match(key))
+    );
+    return;
+  }
+
   e.respondWith(
     fetch(req)
       .then((res) => {
         if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
         return res;
       })
-      .catch(() => caches.match(req, { ignoreSearch: true }))
+      .catch(async () => (await caches.match(req)) || caches.match(req, { ignoreSearch: true }))
   );
 });

@@ -142,11 +142,12 @@ def get_dims(path: Path):
 # -------------------------------------------------------------- المصغّرات
 def build_thumb(src: Path, rel: Path):
     """ينشئ صورة مصغّرة WebP. يتخطّى الملف إذا كانت المصغّرة محدّثة أصلًا."""
+    dest = THUMBS / rel.with_suffix(".webp")
+    # مصغّرة محفوظة مسبقًا تُستخدم حتى لو غابت Pillow (وإلا تُحذف وتظهر الصور بحجمها الكامل)
+    if dest.exists() and (not HAS_PIL or dest.stat().st_mtime >= src.stat().st_mtime):
+        return dest
     if not HAS_PIL:
         return None
-    dest = THUMBS / rel.with_suffix(".webp")
-    if dest.exists() and dest.stat().st_mtime >= src.stat().st_mtime:
-        return dest
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(src) as im:
@@ -163,11 +164,12 @@ def build_thumb(src: Path, rel: Path):
 
 def build_poster(src: Path, rel: Path):
     """يستخرج صورة غلاف من الفيديو باستخدام ffmpeg."""
+    dest = THUMBS / rel.with_suffix(".jpg")
+    # غلاف محفوظ مسبقًا يُستخدم حتى لو غاب ffmpeg (Cloudflare لا يوفّره)، وإلا تختفي الفيديوهات من المتجر
+    if dest.exists() and (not FFMPEG or dest.stat().st_mtime >= src.stat().st_mtime):
+        return dest
     if not FFMPEG:
         return None
-    dest = THUMBS / rel.with_suffix(".jpg")
-    if dest.exists() and dest.stat().st_mtime >= src.stat().st_mtime:
-        return dest
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(
@@ -245,11 +247,11 @@ def load_known_dates() -> dict:
 
 def added_time(path: Path, rel: Path, dates: dict, known=None, by_title=None) -> float:
     key = "media/" + rel.as_posix()
-    for iso in (dates.get(key), (known or {}).get(key), (by_title or {}).get(path.stem.strip())):
+    for iso in (dates.get(key), (known or {}).get(key), (by_title or {}).get(path.stem.strip()), (by_title or {}).get(pretty_title(path.stem))):
         if iso:
             try:
                 return datetime.fromisoformat(iso).timestamp()
-            except ValueError:
+            except (ValueError, TypeError):
                 pass
     return path.stat().st_mtime        # لا مصدر معروف (معاينة محلية لملف جديد)
 
@@ -379,6 +381,8 @@ def write_product_pages(items, cfg, shop, base):
         extra = prods.get(it["id"]) or prods.get(it["title"]) or {}
         if extra.get("hidden"):
             continue
+        if it.get("type") == "video" and not it.get("thumb"):
+            continue                                   # المتجر يخفي الفيديو بلا غلاف
         sid = short_id(it["id"])
         price = extra.get("price")
         priced = isinstance(price, (int, float))
@@ -391,7 +395,7 @@ def write_product_pages(items, cfg, shop, base):
               "description": desc, "category": it["category"], "brand": {"@type": "Brand", "name": brand}, "url": page}
         if priced:
             ld["offers"] = {"@type": "Offer", "price": price, "priceCurrency": "YER", "url": page,
-                            "availability": "https://schema.org/InStock" if extra.get("stock") != 0 or shop.get("makeDays") else "https://schema.org/OutOfStock"}
+                            "availability": "https://schema.org/InStock" if extra.get("stock") != 0 or extra.get("days") or shop.get("makeDays") else "https://schema.org/OutOfStock"}
         title = f"{it['title']} — {brand}"
         html = f"""<!doctype html>
 <html lang="ar" dir="rtl">
@@ -409,7 +413,7 @@ def write_product_pages(items, cfg, shop, base):
 <meta property="og:url" content="{html_esc(page)}">
 <meta property="og:locale" content="ar_AR">
 <meta name="twitter:card" content="summary_large_image">
-<script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
+<script type="application/ld+json">{json.dumps(ld, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")}</script>
 <script>if(!/{BOT_UA}/i.test(navigator.userAgent))location.replace({json.dumps(target)});</script>
 <style>body{{margin:0;font-family:system-ui,sans-serif;background:#faf6f2;color:#241c19;display:grid;place-items:center;min-height:100vh;text-align:center}}main{{max-width:520px;padding:24px}}img{{width:100%;border-radius:18px}}a{{display:inline-block;margin-top:14px;padding:12px 26px;border-radius:999px;background:#241c19;color:#fff;text-decoration:none}}</style>
 </head>
@@ -474,7 +478,7 @@ def strip_internal():
         if (ROOT / d).exists():
             shutil.rmtree(ROOT / d, ignore_errors=True)
             n += 1
-    for f in ROOT.glob("*.md"):
+    for f in [*ROOT.glob("*.md"), *ROOT.glob("*.bat")]:
         f.unlink()
         n += 1
     return n

@@ -31,7 +31,16 @@
   const makeId = (rel) => rel.replace(/\.[^.]+$/, '').normalize('NFKC').replace(/[\s/\\]+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '').replace(/^-+|-+$/g, '').toLowerCase();
   const shortId = (s) => { let h = 0x811c9dc5; for (const ch of String(s)) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
   const norm = (s) => String(s || '').toLowerCase().replace(/[ً-ْـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي');
-  const toNum = (v) => { const s = String(v ?? '').replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^\d.]/g, ''); if (s === '') return null; const n = Number(s); return Number.isFinite(n) ? n : null; };
+  const latin = (v) => String(v ?? '').replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+  // تاريخ اليوم بتوقيت اليمن (لانتهاء الكوبونات، مثل المتجر وجدول الطلبات)
+  const todayAden = () => {
+    try {
+      const o = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Aden', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+      if (o.year && o.month && o.day) return `${o.year}-${o.month}-${o.day}`;
+    } catch { /* */ }
+    return new Date(Date.now() + 3 * 36e5).toISOString().slice(0, 10);
+  };
+  const toNum = (v) => { const s = latin(v).replace(/[٬,](?=\d{3}(?!\d))/g, '').replace(/[^\d.]/g, ''); if (s === '') return null; const n = Number(s); return Number.isFinite(n) ? n : null; };
   let NF = new Intl.NumberFormat('ar-u-nu-arab');
   const num = (n) => NF.format(n);
   const money = (n) => `${NF.format(n)} ${SHOP.currency || 'ر.ي'}`;
@@ -53,7 +62,7 @@
   /* ═══════════ GitHub ═══════════ */
   async function gh(path, { method = 'GET', body } = {}) {
     const r = await fetch(`https://api.github.com${path}`, {
-      method,
+      method, cache: 'no-store',
       headers: { Authorization: `Bearer ${CFG.token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', ...(body ? { 'Content-Type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -111,10 +120,12 @@
     const k = Math.min(1, max / Math.max(sw, sh));
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(sw * k)); c.height = Math.max(1, Math.round(sh * k));
-    c.getContext('2d').drawImage(source, 0, 0, c.width, c.height);
+    const g = c.getContext('2d');
+    if (mime === 'image/jpeg') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height); }   // الشفافية تصبح بيضاء لا سوداء
+    g.drawImage(source, 0, 0, c.width, c.height);
     const done = (b, res) => res({ blob: b, w: c.width, h: c.height });
     // بعض متصفحات الجوال لا تدعم WebP: نرجع إلى JPEG
-    return new Promise((res, rej) => c.toBlob((b) => (b ? done(b, res) : c.toBlob((j) => (j ? done(j, res) : rej(new Error('تعذّر تجهيز الصورة'))), 'image/jpeg', quality)), mime, quality));
+    return new Promise((res, rej) => c.toBlob((b) => (b && b.type === mime ? done(b, res) : c.toBlob((j) => (j ? done(j, res) : rej(new Error('تعذّر تجهيز الصورة'))), 'image/jpeg', quality)), mime, quality));
   }
   async function loadImage(file) {
     try { return await createImageBitmap(file); } catch {
@@ -207,7 +218,7 @@
   const bulkTxt = (b) => (Array.isArray(b) ? b.map((x) => `${x.min}:${x.price}`).join(', ') : '');
   const parseBulk = (s) => {
     const out = [];
-    String(s || '').replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).split(/[,،\n]+/).forEach((part) => {
+    latin(s).replace(/(\d)[٬,.](?=\d{3}(?!\d))/g, '$1').split(/[,،;\n]+/).forEach((part) => {
       const m = part.match(/(\d+)\s*[:=×x]\s*(\d+)/);
       if (m && +m[1] > 1 && +m[2] > 0) out.push({ min: +m[1], price: +m[2] });
     });
@@ -408,7 +419,7 @@
     const sale = ps.filter((x) => isSale(x.p)).length;
     const out = ps.filter((x) => x.p.stock === 0 && !leadOf(x.p)).length;
     const low = ps.filter((x) => x.p.stock > 0 && x.p.stock <= 2 && !leadOf(x.p)).length;
-    const now = new Date().toISOString().slice(0, 10);
+    const now = todayAden();
     const coupons = Object.values(SHOP.coupons || {}).filter((c) => c.active !== false && !(c.expires && c.expires < now)).length;
     $('#helloSub').textContent = priced < ITEMS.length ? `${plural(ITEMS.length - priced, 'قطعة', 'قطع', 'قطعة')} بانتظار التسعير.` : 'كل القطع مسعّرة، متجرك جاهز للبيع ✦';
     const stat = (go, ic, label, val, sub) => `<button class="stat" data-go="${go}"><span class="stat-top">${label}${icon(ic)}</span><b>${val}</b><small>${sub}</small></button>`;
@@ -426,7 +437,7 @@
       if (left <= 30) alerts.push(left <= 0 ? 'انتهى مفتاح الوصول! أنشئ مفتاحًا جديدًا الآن (الخطوات في «الدليل»).' : `مفتاح الوصول ينتهي بعد ${left === 1 ? 'يوم واحد' : left === 2 ? 'يومين' : left <= 10 ? `${num(left)} أيام` : `${num(left)} يومًا`}. جدّده من GitHub قبل أن تتوقف اللوحة عن الحفظ.`);
     }
     if (SHOP.pause?.on) alerts.push('استقبال الطلبات متوقف حاليًا (وضع الإجازة). أعد تشغيله من «التوصيل والدفع».');
-    const now0 = new Date().toISOString().slice(0, 10);
+    const now0 = todayAden();
     const expiring = Object.entries(SHOP.coupons || {}).filter(([, c]) => c.active !== false && c.expires && c.expires >= now0 && (new Date(c.expires) - Date.now()) < 3 * 864e5).map(([k]) => k);
     if (expiring.length) alerts.push(`ينتهي قريبًا: ${expiring.join('، ')}. جهّز العرض التالي من «العروض».`);
     $('#homeAlerts').innerHTML = alerts.map((a) => `<div class="banner warn">${icon('alert')} ${esc(a)}</div>`).join('');
@@ -525,7 +536,7 @@
         <div class="rev-f">
           <label class="fld wide"><span>اسم المنتج</span><input type="text" data-f="title" value="${esc(q.title)}"></label>
           <label class="fld"><span>التصنيف</span><select data-f="category">${catOptions(q.category)}</select></label>
-          <label class="fld"><span>السعر <small>(اختياري)</small></span><span class="inp money"><input type="number" min="0" step="100" data-f="price" value="${esc(q.price)}" placeholder="عند الطلب"><em class="cur">${esc(SHOP.currency || 'ر.ي')}</em></span></label>
+          <label class="fld"><span>السعر <small>(اختياري)</small></span><span class="inp money"><input type="text" inputmode="numeric" data-f="price" value="${esc(q.price)}" placeholder="عند الطلب"><em class="cur">${esc(SHOP.currency || 'ر.ي')}</em></span></label>
           <div class="rev-meta"><span>${q.kind === 'video' ? 'فيديو' : 'صورة'} · ${mb} م.ب</span><button class="link-btn" data-drop="${i}">إزالة</button></div>
         </div></div>`;
     }).join('');
@@ -550,14 +561,18 @@
     renderReview();
   });
   function clearQueue() { queue.forEach((q) => q.preview && URL.revokeObjectURL(q.preview)); queue = []; }
-  function uniquePath(cat, title, outExt, taken) {
+  function uniquePath(cat, title, outExt, taken, self) {
     const base = safeName(title) || 'منتج';
+    const titles = new Set(ITEMS.filter((i) => i !== self).map((i) => i.title));
+    const used = (nm) => titles.has(nm) || taken.has(`title:${nm}`) || [...taken].some((t) => t.startsWith(`media/${cat}/${nm}.`));
     let name = base, n = 2;
-    while (taken.has(`media/${cat}/${name}.${outExt}`)) name = `${base} ${n++}`;
+    while (used(name)) name = `${base} ${n++}`;
     taken.add(`media/${cat}/${name}.${outExt}`);
+    taken.add(`title:${name}`);
     return { path: `media/${cat}/${name}.${outExt}`, name };
   }
   $('#revPublish').addEventListener('click', async () => {
+    const backup = JSON.parse(JSON.stringify(SHOP));
     const taken = new Set(ITEMS.map((i) => i.path));
     const entries = [], added = [];
     for (const q of queue) {
@@ -576,12 +591,12 @@
     try {
       busy('جارٍ الرفع…');
       await saveAll(entries, `إضافة ${added.length} منتج`);
-      ITEMS.push(...added);
+      try { await loadItems(); } catch { ITEMS.push(...added); }   // أرقام الملفات الجديدة لازمة لأي نقل أو تعديل لاحق
       refreshCats();
       clearQueue();
       render();
       toast('تم نشر المنتجات');
-    } catch (err) { toast('تعذّر النشر: ' + err.message, true); } finally { idle(); }
+    } catch (err) { SHOP = backup; render(); toast('تعذّر النشر: ' + err.message, true); } finally { idle(); }
   });
 
   /* ---------- محرر المنتج ---------- */
@@ -640,16 +655,17 @@
     const price = toNum($('#isPrice').value), old = toNum($('#isOld').value);
     if (old != null && price != null && old <= price) { toast('«قبل الخصم» يجب أن يكون أكبر من السعر', true); return; }
     const entries = [];
-    const moved = title !== it.title || cat !== it.category;
-    if (moved && it.pending) { toast('انتظر اكتمال نشر هذا المنتج أولًا', true); return; }
+    const moved = title !== safeName(it.title) || cat !== safeName(it.category);
+    if (moved && (it.pending || !it.sha)) { toast('انتظر اكتمال نشر هذا المنتج أولًا، ثم اضغط 🔄', true); return; }
     const oldTitle = it.title, oldId = it.id;
+    const backup = { shop: JSON.parse(JSON.stringify(SHOP)), it: { ...it } };
     if (moved) {
       const taken = new Set(ITEMS.filter((x) => x !== it).map((x) => x.path));
-      const { path: newPath, name } = uniquePath(cat, title, ext(it.path), taken);
+      const { path: newPath, name } = uniquePath(cat, title, ext(it.path), taken, it);
       entries.push({ path: it.path, sha: null }, { path: newPath, sha: it.sha });
       let newThumb = null;
       if (it.thumbPath && it.thumbSha) { newThumb = `media/_thumbs/${cat}/${name}.${ext(it.thumbPath)}`; entries.push({ path: it.thumbPath, sha: null }, { path: newThumb, sha: it.thumbSha }); }
-      Object.assign(it, { path: newPath, id: makeId(newPath.slice(6)), title: name, category: cat, thumbPath: newThumb, pending: true });
+      Object.assign(it, { path: newPath, id: makeId(newPath.slice(6)), title: name, category: cat, thumbPath: newThumb });
       renameP(oldTitle, oldId, it);
       // الرابط القديم للقطعة (المنشور في إنستقرام مثلًا) يبقى يفتحها بعد تغيير الاسم
       const e = (SHOP.products[it.title] ||= {});
@@ -663,14 +679,16 @@
       refreshCats();
       render();
       toast('تم الحفظ');
-    } catch (err) { toast('تعذّر الحفظ: ' + err.message, true); } finally { idle(); }
+    } catch (err) { SHOP = backup.shop; Object.assign(it, backup.it); render(); toast('تعذّر الحفظ: ' + err.message, true); } finally { idle(); }
   });
   $('#isDelete').addEventListener('click', async () => {
     const it = editing;
     if (!it || !confirm(`حذف «${it.title}» نهائيًا من المتجر؟`)) return;
     const entries = [{ path: it.path, sha: null }];
     if (it.thumbPath) entries.push({ path: it.thumbPath, sha: null });
+    const backup = JSON.parse(JSON.stringify(SHOP));
     delete SHOP.products[it.title]; delete SHOP.products[it.id];
+    if (SHOP.story && SHOP.story.image === it.title) delete SHOP.story.image;
     closeSheet('itemSheet');
     try {
       busy('جارٍ الحذف…');
@@ -680,7 +698,7 @@
       if (UI.pCat !== '*' && !CATS.includes(UI.pCat)) UI.pCat = '*';
       render();
       toast('تم الحذف');
-    } catch (err) { toast('تعذّر الحذف: ' + err.message, true); } finally { idle(); }
+    } catch (err) { SHOP = backup; render(); toast('تعذّر الحذف: ' + err.message, true); } finally { idle(); }
   });
 
   /* ═══════════ الأسعار ═══════════ */
@@ -770,7 +788,13 @@
       if (a === 'set') { setP(it, { price: v, oldPrice: null }); n++; }
       else if (a === 'unsale') { if (isSale(p)) { setP(it, { price: p.oldPrice, oldPrice: null }); n++; } }
       else if (p.price != null) {
-        if (a === 'sale') { const base = isSale(p) ? p.oldPrice : p.price; setP(it, { oldPrice: base, price: round(base * (1 - v / 100)) }); }
+        if (a === 'sale') {
+          const base = isSale(p) ? p.oldPrice : p.price;
+          let np = round(base * (1 - v / 100));
+          if (np >= base) np = Math.floor(base * (1 - v / 100) / step) * step;   // التقريب لا يلغي الخصم
+          if (np <= 0 || np >= base) continue;
+          setP(it, { oldPrice: base, price: np });
+        }
         else { const sign = $('#bkVal').value.trim().startsWith('-') ? -1 : 1; setP(it, { price: round(p.price * (1 + sign * v / 100)), oldPrice: p.oldPrice != null ? round(p.oldPrice * (1 + sign * v / 100)) : null }); }
         n++;
       }
@@ -790,7 +814,7 @@
     renderPromoPreview();
     $('#tiersOn').checked = SHOP.tiersOn !== false && (SHOP.tiers || []).length > 0;
     $$('#tiersBox [data-t]').forEach((inp) => { const t = (SHOP.tiers || [])[+inp.dataset.t]; inp.value = t ? t[inp.dataset.f] : ''; });
-    const now = new Date().toISOString().slice(0, 10);
+    const now = todayAden();
     const list = Object.entries(SHOP.coupons || {});
     $('#coupons').innerHTML = list.map(([code, c]) => {
       const exp = c.expires && c.expires < now;
@@ -950,7 +974,7 @@
     const f = e.target.dataset.zf;
     if (!f) return;
     const z = SHOP.deliveryZones[+e.target.closest('[data-z]').dataset.z];
-    if (f === 'fee') z.fee = e.target.value.trim() === '' ? null : (toNum(e.target.value) ?? 0);   // فارغ = يُحدَّد عند التأكيد
+    if (f === 'fee') z.fee = toNum(e.target.value);   // فارغ = يُحدَّد عند التأكيد
     else if (f === 'free') { if (e.target.checked) delete z.free; else z.free = false; }
     else if (e.target.value.trim()) z[f] = e.target.value; else delete z[f];
     markDirty('ship');
@@ -1074,7 +1098,7 @@
     $('#sLogoPrev').src = stagedLogo ? stagedLogo.url : rawURL(SITE.logo || 'assets/logo.png') + '?t=' + Date.now();
     waCheck();
   }
-  const normalizeWa = (raw) => { let d = String(raw || '').replace(/[٠-٩]/g, (c) => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/\D/g, ''); if (d.startsWith('00')) d = d.slice(2); return d; };
+  const normalizeWa = (raw) => { let d = latin(raw).replace(/\D/g, ''); if (d.startsWith('00')) d = d.slice(2); return d; };
   function waCheck() {
     const el = $('#sWaCheck'), d = normalizeWa($('#sWa').value);
     if (!d) { el.hidden = true; return; }
@@ -1116,7 +1140,7 @@
   });
   $('#btnRefresh').addEventListener('click', async () => {
     if (changes.size && !confirm('التحديث سيتجاهل التعديلات غير المحفوظة. متابعة؟')) return;
-    try { busy('جارٍ التحديث…'); await loadItems(); await loadConfig(); render(); toast('تم التحديث'); }
+    try { busy('جارٍ التحديث…'); await loadItems(); await loadConfig(); if (stagedLogo) { URL.revokeObjectURL(stagedLogo.url); stagedLogo = null; } render(); toast('تم التحديث'); }
     catch (e) { toast(e.message, true); } finally { idle(); }
   });
   $('#btnLogout').addEventListener('click', () => {

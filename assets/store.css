@@ -113,7 +113,8 @@ h1, h2, h3 { font-family: var(--f-head); font-weight: 400; line-height: 1.35; ma
 .announce { background: var(--ink-bg); color: var(--ink-text); text-align: center; font-size: .8rem; letter-spacing: .02em; padding: 9px 16px; min-height: 38px; }
 .announce span { display: inline-block; transition: opacity .4s, transform .4s; }
 .announce.promo { background: linear-gradient(90deg, #5c2a35, #8c4d5c, #5c2a35); color: #fff; font-weight: 500; }
-.announce .cd { display: inline-flex; align-items: center; gap: 3px; margin-inline-start: 10px; direction: ltr; font-variant-numeric: tabular-nums; }
+.announce .cd { display: inline-flex; align-items: center; gap: 3px; margin-inline-start: 10px; font-variant-numeric: tabular-nums; }
+.announce .cd .hms { display: inline-flex; align-items: center; gap: 3px; direction: ltr; }
 .announce .cd b { background: rgba(255,255,255,.16); border-radius: 3px; padding: 0 6px; font-weight: 600; }
 .announce .cd i { font-style: normal; opacity: .8; font-size: .75rem; }
 .announce span.out { opacity: 0; transform: translateY(-6px); }
