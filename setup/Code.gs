@@ -332,3 +332,8 @@ function notify_(d, items, count, check) {
   </div>`;
   MailApp.sendEmail({ to, subject: `🛍 طلب جديد ${d.id} — ${STORE_NAME}`, htmlBody: html, name: STORE_NAME });
 }
+
+/** شغّلها من المحرر (اختر testInternet ثم Run) لمنح إذن قراءة الأسعار والتأكد أنه يعمل: يجب أن يظهر 200 */
+function testInternet() {
+  Logger.log('قراءة الأسعار: ' + UrlFetchApp.fetch(RAW_SHOP_URL, { muteHttpExceptions: true }).getResponseCode());
+}
