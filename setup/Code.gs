@@ -18,6 +18,8 @@ const STATUSES     = ['جديد', 'تم التأكيد', 'قيد التجهيز'
 const SPREADSHEET_ID = '';
 // رابط ملف أسعار المتجر: يعيد الكود حساب المبلغ منه ليكشف أي تلاعب بالأسعار
 const SHOP_URL = 'https://elora-shop.pages.dev/shop.json';
+// نسخة احتياطية من ملف الأسعار نفسه على GitHub، إن رفض الموقع طلب خوادم Google
+const RAW_SHOP_URL = 'https://raw.githubusercontent.com/elora-shop/elora-shop.github.io/main/shop.json';
 // حماية من سيل الطلبات الوهمية (عدد مرات «تأكيد الطلب»، لا عدد القطع: طلب فيه ١٠٠ قطعة = طلب واحد)
 // إن تجاوزها زبون حقيقي يظهر له زر «أرسل عبر واتساب» فلا يضيع طلبه
 const MAX_PER_PHONE_HOUR = 10;     // أقصى عدد طلبات منفصلة من الرقم نفسه خلال ساعة
@@ -146,6 +148,11 @@ function doPost(e) {
 
 /** يتيح للمتجر معرفة حالة طلب برقمه (لا يُرجع أي بيانات شخصية) */
 function doGet(e) {
+  // فحص سريع لقراءة الأسعار (لا يُرجع أي بيانات شخصية): ?diag=1
+  if (e && e.parameter && e.parameter.diag) {
+    const f = fetchShop_(true);
+    return json_({ ok: !!f.raw, source: f.source || '', error: f.err || '', size: f.raw ? f.raw.length : 0 });
+  }
   const ids = String((e && e.parameter && e.parameter.ids) || '').split(',')
     .map((s) => s.trim()).filter((s) => /^EL-\d{6}-[A-Z0-9]{4,8}$/.test(s)).slice(0, 20);
   if (!ids.length) return json_({ ok: true, store: STORE_NAME });
@@ -221,15 +228,9 @@ function txt_(s) {
 /** يعيد حساب المبلغ من أسعار المتجر الحقيقية (shop.json) ويقارنه بما أرسله المتصفح */
 function verify_(d) {
   try {
-    const cache = CacheService.getScriptCache();
-    let raw = cache.get('shop');
-    if (!raw) {
-      const res = UrlFetchApp.fetch(SHOP_URL + '?t=' + Date.now(), { muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0 (ELORA orders)' } });
-      if (res.getResponseCode() !== 200) return null;
-      raw = res.getContentText();
-      try { cache.put('shop', raw, 300); } catch (err) { /* أكبر من حد الذاكرة المؤقتة: لا مشكلة */ }
-    }
-    const shop = JSON.parse(raw);
+    const f = fetchShop_(false);
+    if (!f.raw) return { ok: true, label: 'تعذّر التحقق الآن (' + f.err + ')' };
+    const shop = JSON.parse(f.raw);
     const P = shop.products || {};
     let sub = 0, unpriced = false, unknown = 0, mismatch = 0;
     const units = [], names = [];
@@ -268,8 +269,32 @@ function verify_(d) {
       : '⚠ المبلغ الصحيح: ' + fmt_(total) + (unpriced ? ' + قطع سعرها عند الطلب' : '');
     return { ok, total, label, units, names };
   } catch (err) {
-    return null;                       // لا نوقف الطلب إن تعذّر التحقق
+    return { ok: true, label: 'تعذّر التحقق الآن (' + String(err).slice(0, 60) + ')' };   // لا نوقف الطلب إن تعذّر التحقق
   }
+}
+
+/** يقرأ ملف أسعار المتجر: من الموقع، ثم من GitHub إن رُفض الطلب. يُحفظ ٥ دقائق */
+function fetchShop_(noCache) {
+  const cache = CacheService.getScriptCache();
+  if (!noCache) { const hit = cache.get('shop'); if (hit) return { raw: hit, source: 'cache' }; }
+  const errs = [];
+  const sources = [['site', SHOP_URL + '?t=' + Date.now()], ['github', RAW_SHOP_URL + '?t=' + Date.now()]];
+  for (let i = 0; i < sources.length; i++) {
+    const name = sources[i][0], url = sources[i][1];
+    try {
+      const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true, headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' } });
+      const code = res.getResponseCode(), txt = res.getContentText();
+      if (code === 200 && /^\s*\{/.test(txt)) {
+        JSON.parse(txt);                                    // نتأكد أنه ملف أسعار صالح
+        try { cache.put('shop', txt, 300); } catch (err) { /* أكبر من حد الذاكرة المؤقتة */ }
+        return { raw: txt, source: name };
+      }
+      errs.push(name + ' ' + code);
+    } catch (err) {
+      errs.push(name + ' ' + String(err).slice(0, 50));
+    }
+  }
+  return { err: errs.join('، ') };
 }
 function notify_(d, items, count, check) {
   const to = NOTIFY_EMAIL || Session.getEffectiveUser().getEmail();
