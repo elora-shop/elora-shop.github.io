@@ -518,15 +518,16 @@
     if (failed.length) toast(failed[0], true);
     if (!queue.length) return;
     queue.forEach((q) => {
-      q.title = safeName(stem(q.file.name).replace(/^(IMG|VID|PXL|DSC|PHOTO)[-_ ]*/i, '').replace(/^\d{4}[-_]?\d{2}[-_]?\d{2}([-_ ]?WA)?\d*[-_ ]*/i, '').replace(/[-_]+/g, ' ').trim()) || 'منتج جديد';
-      q.category = UI.pCat !== '*' ? UI.pCat : (CATS[0] || 'عام');
+      const guess = safeName(stem(q.file.name).replace(/^(IMG|VID|PXL|DSC|PHOTO)[-_ ]*/i, '').replace(/^\d{4}[-_]?\d{2}[-_]?\d{2}([-_ ]?WA)?\d*[-_ ]*/i, '').replace(/[-_]+/g, ' ').trim());
+      q.title = /\p{L}{2,}/u.test(guess) ? guess : '';            // اسم ملف من أرقام (مثل 1000597662) لا يصلح اسمًا للقطعة
+      q.category = UI.pCat !== '*' ? UI.pCat : '';                 // يُختار صراحةً حتى لا تذهب القطعة لتصنيف خاطئ
       q.price = '';
     });
     renderReview();
     openSheet('review');
   });
   function catOptions(sel) {
-    return [...new Set([...CATS, sel])].filter(Boolean).map((c) => `<option value="${esc(c)}"${c === sel ? ' selected' : ''}>${esc(c)}</option>`).join('') + '<option value="__new__">＋ تصنيف جديد…</option>';
+    return (sel ? '' : '<option value="" selected disabled>اختر التصنيف…</option>') + [...new Set([...CATS, sel])].filter(Boolean).map((c) => `<option value="${esc(c)}"${c === sel ? ' selected' : ''}>${esc(c)}</option>`).join('') + '<option value="__new__">＋ تصنيف جديد…</option>';
   }
   function renderReview() {
     $('#revList').innerHTML = queue.map((q, i) => {
@@ -534,7 +535,7 @@
       const mb = (q.full.size / 1048576).toFixed(1);
       return `<div class="rev-item" data-i="${i}"><img src="${q.preview}" alt="">
         <div class="rev-f">
-          <label class="fld wide"><span>اسم المنتج</span><input type="text" data-f="title" value="${esc(q.title)}"></label>
+          <label class="fld wide"><span>اسم المنتج</span><input type="text" data-f="title" value="${esc(q.title)}" placeholder="مثال: سوار اللؤلؤ الوردي"></label>
           <label class="fld"><span>التصنيف</span><select data-f="category">${catOptions(q.category)}</select></label>
           <label class="fld"><span>السعر <small>(اختياري)</small></span><span class="inp money"><input type="text" inputmode="numeric" data-f="price" value="${esc(q.price)}" placeholder="عند الطلب"><em class="cur">${esc(SHOP.currency || 'ر.ي')}</em></span></label>
           <div class="rev-meta"><span>${q.kind === 'video' ? 'فيديو' : 'صورة'} · ${mb} م.ب</span><button class="link-btn" data-drop="${i}">إزالة</button></div>
@@ -572,6 +573,15 @@
     return { path: `media/${cat}/${name}.${outExt}`, name };
   }
   $('#revPublish').addEventListener('click', async () => {
+    // لا نشر قبل أن يكون لكل قطعة اسم وتصنيف
+    const miss = queue.findIndex((q) => !safeName(q.title) || !safeName(q.category));
+    if (miss > -1) {
+      const q = queue[miss], row = $(`#revList .rev-item[data-i="${miss}"]`);
+      const fld = row && row.querySelector(!safeName(q.title) ? '[data-f="title"]' : '[data-f="category"]');
+      if (fld) { fld.focus(); fld.closest('.fld')?.classList.add('bad'); }
+      toast(!safeName(q.title) ? 'اكتب اسم كل منتج قبل النشر' : 'اختر تصنيف كل منتج قبل النشر', true);
+      return;
+    }
     const backup = JSON.parse(JSON.stringify(SHOP));
     const taken = new Set(ITEMS.map((i) => i.path));
     const entries = [], added = [];
