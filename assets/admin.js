@@ -104,13 +104,17 @@
   }
 
   /* ═══════════ الصور والفيديو ═══════════ */
-  function render(source, max, mime, quality) {
-    const sw = source.width || source.videoWidth, sh = source.height || source.videoHeight;
+  // تصغير صورة أو إطار فيديو إلى ملف (اسمها مختلف عن render() التي ترسم واجهة اللوحة، وكان تشابه الاسمين يعطّل رفع الصور)
+  function shrink(source, max, mime, quality) {
+    const sw = source.width || source.videoWidth || source.naturalWidth, sh = source.height || source.videoHeight || source.naturalHeight;
+    if (!sw || !sh) return Promise.reject(new Error('تعذّر قراءة الصورة'));
     const k = Math.min(1, max / Math.max(sw, sh));
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(sw * k)); c.height = Math.max(1, Math.round(sh * k));
     c.getContext('2d').drawImage(source, 0, 0, c.width, c.height);
-    return new Promise((res) => c.toBlob((b) => res({ blob: b, w: c.width, h: c.height }), mime, quality));
+    const done = (b, res) => res({ blob: b, w: c.width, h: c.height });
+    // بعض متصفحات الجوال لا تدعم WebP: نرجع إلى JPEG
+    return new Promise((res, rej) => c.toBlob((b) => (b ? done(b, res) : c.toBlob((j) => (j ? done(j, res) : rej(new Error('تعذّر تجهيز الصورة'))), 'image/jpeg', quality)), mime, quality));
   }
   async function loadImage(file) {
     try { return await createImageBitmap(file); } catch {
@@ -121,9 +125,9 @@
   async function prepImage(file) {
     const bmp = await loadImage(file);
     try {
-      const full = await render(bmp, FULL_MAX, 'image/jpeg', 0.85);
-      const thumb = await render(bmp, THUMB_MAX, 'image/webp', 0.8);
-      return { kind: 'image', full: full.blob, thumb: thumb.blob, outExt: 'jpg', thumbExt: 'webp' };
+      const full = await shrink(bmp, FULL_MAX, 'image/jpeg', 0.85);
+      const thumb = await shrink(bmp, THUMB_MAX, 'image/webp', 0.8);
+      return { kind: 'image', full: full.blob, thumb: thumb.blob, outExt: 'jpg', thumbExt: thumb.blob.type === 'image/webp' ? 'webp' : 'jpg' };
     } finally { bmp.close?.(); }
   }
   async function prepVideo(file) {
@@ -134,7 +138,7 @@
     try {
       await new Promise((res, rej) => { v.onloadeddata = res; v.onerror = () => rej(new Error('تعذّر قراءة الفيديو')); setTimeout(() => rej(new Error('مهلة')), 15000); });
       await new Promise((res) => { v.onseeked = res; v.currentTime = Math.min(1, (v.duration || 3) / 3); setTimeout(res, 4000); });
-      thumb = (await render(v, THUMB_MAX, 'image/jpeg', 0.8)).blob;
+      thumb = (await shrink(v, THUMB_MAX, 'image/jpeg', 0.8)).blob;
     } catch { /* بلا غلاف */ } finally { URL.revokeObjectURL(url); }
     return { kind: 'video', full: file, thumb, outExt: ext(file.name), thumbExt: 'jpg' };
   }
