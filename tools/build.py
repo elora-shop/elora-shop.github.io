@@ -147,7 +147,9 @@ def build_thumb(src: Path, rel: Path):
     if dest.exists() and (not HAS_PIL or dest.stat().st_mtime >= src.stat().st_mtime):
         return dest
     if not HAS_PIL:
-        return None
+        # آيفون لا يصنع WebP فترفع اللوحة المصغّرة بصيغة JPG
+        jpg = THUMBS / rel.with_suffix(".jpg")
+        return jpg if jpg.exists() else None
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(src) as im:
@@ -261,6 +263,11 @@ def scan():
     items, skipped = [], 0
     dates = git_added_dates()
     known, by_title = load_known_dates()
+    # الأسماء المسجّلة في shop.json (تكتبها لوحة التحكم كما هي): تبقى كما هي حتى يجد المتجر سعرها وإعداداتها
+    try:
+        shop_keys = set((json.loads((ROOT / "shop.json").read_text(encoding="utf-8")).get("products") or {}).keys())
+    except Exception:
+        shop_keys = set()
 
     for path in sorted(MEDIA.rglob("*")):
         if not path.is_file():
@@ -290,7 +297,7 @@ def scan():
 
         items.append({
             "id":       make_id(rel),
-            "title":    pretty_title(path.stem),
+            "title":    path.stem.strip() if path.stem.strip() in shop_keys else pretty_title(path.stem),
             "category": category,
             "type":     kind,
             "src":      "media/" + url_path(rel),

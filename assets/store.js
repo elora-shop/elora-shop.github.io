@@ -89,12 +89,21 @@
     ITEMS.forEach((p) => { p.sid = shortId(p.id); BY.set(p.id, p); BYSID.set(p.sid, p); });
     // روابط قديمة لقطع أُعيدت تسميتها تبقى تفتحها
     ITEMS.forEach((p) => p.aliases.forEach((a) => { if (!BYSID.has(a)) BYSID.set(a, p); }));
+    // قطعة أُعيدت تسميتها تبقى في السلة والمفضلة (عبر رابطها القديم)
+    const moveId = (id) => (BY.has(id) ? id : (BYSID.get(shortId(id)) || {}).id || id);
+    for (const id of Object.keys(S.cart)) {
+      const nid = moveId(id);
+      if (nid !== id) { S.cart[nid] = (S.cart[nid] || 0) + S.cart[id]; delete S.cart[id]; }
+    }
+    S.wish = [...new Set(S.wish.map(moveId))];
+    S.recent = [...new Set(S.recent.map(moveId))];
     // نظّف السلة والمفضلة من قطع لم تعد موجودة
     for (const id in S.cart) {
       const p = BY.get(id);
       if (!p || p.stock === 0 && !(p.days || Number(SHOP.makeDays) > 0)) { delete S.cart[id]; continue; }
       const lead = p.days || (Number(SHOP.makeDays) > 0 ? Number(SHOP.makeDays) : 0);
       if (!lead && p.stock != null && S.cart[id] > p.stock) S.cart[id] = p.stock;
+      if (S.cart[id] > 999) S.cart[id] = 999;
     }
     S.wish = S.wish.filter((id) => BY.has(id));
     S.recent = S.recent.filter((id) => BY.has(id));
@@ -116,7 +125,9 @@
   const ready = (p, q = 1) => p.stock != null && p.stock >= q;     // تُسلَّم فورًا من الجاهز
   const booking = (p) => p.stock === 0 && madeToOrder(p);          // لا جاهز، تُصنع بعد الحجز
   const soldOut = (p) => p.stock === 0 && !madeToOrder(p);
-  const cap = (p) => (madeToOrder(p) ? null : p.stock);             // الحد الأقصى للكمية (null = مفتوح)
+  const MAXQ = 999;                                                  // أقصى كمية للقطعة في الطلب الواحد (نفس حدّ جدول الطلبات)
+  const cap = (p) => (madeToOrder(p) || p.stock == null ? MAXQ : Math.min(p.stock, MAXQ));
+  const capMsg = (p) => (cap(p) === MAXQ ? `أقصى كمية في الطلب الواحد ${num(MAXQ)} قطعة، وللكميات الأكبر راسلنا` : `المتوفر من هذه القطعة ${num(cap(p))} فقط`);
   const canAdd = (p, extra = 1) => !soldOut(p) && (cap(p) == null || (S.cart[p.id] || 0) + extra <= cap(p));
   const unitPrice = (p, q) => {
     if (p.price == null) return null;
@@ -234,7 +245,8 @@
 
     // شريط العرض المؤقت (بعدّاد تنازلي) يتقدّم على الإعلانات المتناوبة
     const promo = SHOP.promo || {};
-    const promoEnds = promo.ends ? new Date(promo.ends) : null;
+    // وقت الانتهاء بتوقيت اليمن (مثل انتهاء الكوبون)، لا بتوقيت جهاز الزائر
+    const promoEnds = promo.ends ? new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(promo.ends) ? promo.ends : promo.ends.length <= 10 ? `${promo.ends}T23:59:59+03:00` : `${promo.ends}+03:00`) : null;
     const promoLive = promo.active && promo.text && (!promoEnds || promoEnds > new Date());
     const ann = (SHOP.announcements || []).filter(Boolean);
     if (paused()) {
@@ -512,7 +524,7 @@
     const p = BY.get(id);
     if (!p) return false;
     if (!canAdd(p, qty)) {
-      toast(soldOut(p) ? 'هذه القطعة نفدت حاليًا' : `المتوفر من هذه القطعة ${num(cap(p))} فقط`);
+      toast(soldOut(p) ? 'هذه القطعة نفدت حاليًا' : capMsg(p));
       return false;
     }
     S.cart[id] = (S.cart[id] || 0) + qty;
@@ -595,13 +607,24 @@
     if (layers.some((l) => l === 'drawer' || l === 'menu' || l === 'sheet' || l === 'checkout')) return;
     const s = $('#scrim'); s.classList.remove('on'); setTimeout(() => { if (!s.classList.contains('on')) s.hidden = true; }, 300);
   }
+  // ما خلف النافذة المفتوحة يصبح غير قابل للتركيز (لوحة المفاتيح وقارئ الشاشة يبقيان داخل النافذة)
+  const layerEl = {};
+  function syncInert() {
+    const top = layers.length ? layerEl[layers[layers.length - 1]] : null;
+    for (const e of document.body.children) {
+      if (e.tagName === 'SCRIPT' || e.id === 'toasts' || e.id === 'scrim') continue;
+      e.inert = !!top && e !== top;
+    }
+  }
   function openLayer(name, el) {
     if (!layers.length) lastFocus = document.activeElement;
     if (!layers.includes(name)) layers.push(name);
+    layerEl[name] = el;
     el.hidden = false;
     void el.offsetWidth;   // يثبّت الحالة الابتدائية ثم يبدأ الحركة
     el.classList.add('on');
     lock();
+    syncInert();
   }
   function closeLayer(name, el) {
     const i = layers.indexOf(name);
@@ -609,6 +632,7 @@
     layers.splice(i, 1);
     el.classList.remove('on');
     setTimeout(() => { if (!el.classList.contains('on')) el.hidden = true; }, 400);
+    syncInert();
     unlockIfIdle();
     if (!layers.length && lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
   }
@@ -954,7 +978,7 @@
           <h2>لم يكتمل الإرسال المباشر</h2><div class="oid">${esc(o.id)}</div>
           <p>${o.err === 'rate' ? 'وصلتنا طلبات كثيرة متتالية من رقمك، فحوّلنا هذا الطلب إلى واتساب حتى لا يضيع. طلبك محفوظ كاملًا، أرسله بضغطة واحدة.' : 'يبدو أن الاتصال ضعيف. طلبك محفوظ، أرسله الآن عبر واتساب بضغطة واحدة.'}</p>
           <div class="co-actions" style="margin-top:20px">${waBtn('', 'إرسال الطلب عبر واتساب')}</div>
-          <div class="co-actions">${o.err === 'rate' ? '' : '<button class="btn btn-ghost btn-lg" id="retryOrder">إعادة المحاولة</button>'}<button class="btn btn-ghost btn-lg" id="copyOrder">${icon('receipt')} نسخ الطلب</button></div>`;
+          <div class="co-actions duo">${o.err === 'rate' ? '' : '<button class="btn btn-ghost btn-lg" id="retryOrder">إعادة المحاولة</button>'}<button class="btn btn-ghost btn-lg" id="copyOrder">${icon('receipt')} نسخ الطلب</button></div>`;
       } else {
         body = `<div class="ring">${icon('check')}</div>
           <h2>خطوة أخيرة!</h2><div class="oid">${esc(o.id)}</div>
@@ -964,7 +988,7 @@
             <li>احتفظ برقم الطلب، وتجده دائمًا في <b>«طلباتي»</b>.</li>
           </ol>
           <div class="co-actions" style="margin-top:22px">${waBtn('', 'فتح واتساب وإرسال الطلب')}</div>
-          <div class="co-actions"><button class="btn btn-ghost btn-lg" id="copyOrder">${icon('receipt')} نسخ تفاصيل الطلب</button><button class="btn btn-ghost btn-lg" data-close>متابعة التسوق</button></div>`;
+          <div class="co-actions duo"><button class="btn btn-ghost btn-lg" id="copyOrder">${icon('receipt')} نسخ تفاصيل الطلب</button><button class="btn btn-ghost btn-lg" data-close>متابعة التسوق</button></div>`;
       }
       card.innerHTML = html + `<div class="success">${body}</div></div>`;
       return;
@@ -1375,7 +1399,7 @@
       if (!p) return;
       const cur = S.cart[p.id] || 0;
       const want = Math.max(cur, sheetQty);
-      if (want > cur && !canAdd(p, want - cur)) { toast(`المتوفر من هذه القطعة ${num(cap(p))} فقط`); return; }
+      if (want > cur && !canAdd(p, want - cur)) { toast(capMsg(p)); return; }
       if (want !== cur) { S.cart[p.id] = want; save('cart'); updateCounts('cart'); }
       closeSheet();
       openCheckout();

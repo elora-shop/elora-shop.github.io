@@ -28,7 +28,8 @@
   const ext = (n) => (n.split('.').pop() || '').toLowerCase();
   const stem = (n) => n.replace(/\.[^.]+$/, '');
   const safeName = (s) => String(s).replace(/[\\/:*?"<>|]/g, ' ').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().replace(/^\.+/, '').slice(0, 80);
-  const makeId = (rel) => rel.replace(/\.[^.]+$/, '').normalize('NFKC').replace(/[\s/\\]+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '').replace(/^-+|-+$/g, '').toLowerCase();
+  // نفس make_id في build.py (يُبقي الشدّة والحركات وعلامات الترقيم العربية) حتى تتطابق روابط القطع
+  const makeId = (rel) => rel.replace(/\.[^.]+$/, '').normalize('NFKC').replace(/[\s/\\]+/g, '-').replace(/[^\p{L}\p{N}_؀-ۿ-]/gu, '').replace(/^-+|-+$/g, '').toLowerCase();
   const shortId = (s) => { let h = 0x811c9dc5; for (const ch of String(s)) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
   const norm = (s) => String(s || '').toLowerCase().replace(/[ً-ْـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي');
   const latin = (v) => String(v ?? '').replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
@@ -40,7 +41,8 @@
     } catch { /* */ }
     return new Date(Date.now() + 3 * 36e5).toISOString().slice(0, 10);
   };
-  const toNum = (v) => { const s = latin(v).replace(/[٬,](?=\d{3}(?!\d))/g, '').replace(/[^\d.]/g, ''); if (s === '') return null; const n = Number(s); return Number.isFinite(n) ? n : null; };
+  // «15.000» و«15,000» و«١٥٬٠٠٠» = خمسة عشر ألفًا (الأسعار بالريال بلا كسور)، و«٫» فاصلة عشرية
+  const toNum = (v) => { const s = latin(v).replace(/٫/g, '.').replace(/[٬,.](?=\d{3}(?!\d))/g, '').replace(/[^\d.]/g, ''); if (s === '') return null; const n = Number(s); return Number.isFinite(n) ? n : null; };
   let NF = new Intl.NumberFormat('ar-u-nu-arab');
   const num = (n) => NF.format(n);
   const money = (n) => `${NF.format(n)} ${SHOP.currency || 'ر.ي'}`;
@@ -82,9 +84,9 @@
     : CFG.repo.toLowerCase() === `${CFG.owner.toLowerCase()}.github.io` ? `https://${CFG.repo}/` : `https://${CFG.owner}.github.io/${CFG.repo}/`;
 
   /** حفظة واحدة لكل التغييرات. entries: {path, blob} إضافة · {path, sha} نقل · {path, sha:null} حذف */
-  async function commit(entries, message, onProgress) {
-    const ref = await gh(`${repoBase()}/git/ref/heads/${CFG.branch}`);
-    const base = ref.object.sha;
+  async function commit(entries, message, onProgress, baseSha) {
+    // baseSha: النسخة التي قُرئت منها الإعدادات ودُمجت، فلا نبني فوق نسخة أحدث لم نرها
+    const base = baseSha || (await gh(`${repoBase()}/git/ref/heads/${CFG.branch}`)).object.sha;
     const head = await gh(`${repoBase()}/git/commits/${base}`);
     const tree = [];
     let done = 0;
@@ -99,15 +101,20 @@
     }
     const nt = await gh(`${repoBase()}/git/trees`, { method: 'POST', body: { base_tree: head.tree.sha, tree } });
     const nc = await gh(`${repoBase()}/git/commits`, { method: 'POST', body: { message, tree: nt.sha, parents: [base] } });
-    await gh(`${repoBase()}/git/refs/heads/${CFG.branch}`, { method: 'PATCH', body: { sha: nc.sha } });
+    try {
+      await gh(`${repoBase()}/git/refs/heads/${CFG.branch}`, { method: 'PATCH', body: { sha: nc.sha } });
+    } catch (e) {
+      if (e.status === 422) throw new Error('تغيّر المتجر من جهاز آخر أثناء الحفظ. لم يُفقد شيء، أعد المحاولة');
+      throw e;
+    }
     return nc.sha;
   }
   const toBase64 = (blob) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob); });
   const jsonBlob = (o) => new Blob([JSON.stringify(o, null, 2) + '\n'], { type: 'application/json' });
 
-  async function readJSON(path) {
+  async function readJSON(path, ref) {
     try {
-      const r = await gh(`${repoBase()}/contents/${encodeURIComponent(path)}?ref=${CFG.branch}`);
+      const r = await gh(`${repoBase()}/contents/${encodeURIComponent(path)}?ref=${ref || CFG.branch}`);
       return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(r.content.replace(/\s/g, '')), (c) => c.charCodeAt(0))));
     } catch (e) { if (e.status === 404) return {}; throw e; }
   }
@@ -144,11 +151,15 @@
   async function prepVideo(file) {
     if (file.size > VIDEO_MAX_MB * 1048576) throw new Error(`الفيديو أكبر من ${VIDEO_MAX_MB} ميجابايت`);
     const url = URL.createObjectURL(file);
-    const v = Object.assign(document.createElement('video'), { src: url, muted: true, playsInline: true, preload: 'metadata' });
+    const v = Object.assign(document.createElement('video'), { src: url, muted: true, playsInline: true, preload: 'auto' });
+    v.setAttribute('playsinline', ''); v.setAttribute('muted', '');
     let thumb = null;
     try {
-      await new Promise((res, rej) => { v.onloadeddata = res; v.onerror = () => rej(new Error('تعذّر قراءة الفيديو')); setTimeout(() => rej(new Error('مهلة')), 15000); });
+      // آيفون قد لا يحمّل أي إطار قبل تشغيل قصير: ننتظر البيانات الأولية ثم نشغّل ونوقف ثم ننتقل للإطار
+      await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error('تعذّر قراءة الفيديو')); setTimeout(() => rej(new Error('مهلة')), 15000); });
+      await Promise.race([v.play().then(() => v.pause()).catch(() => {}), new Promise((r) => setTimeout(r, 3000))]);
       await new Promise((res) => { v.onseeked = res; v.currentTime = Math.min(1, (v.duration || 3) / 3); setTimeout(res, 4000); });
+      if (v.readyState < 2) await new Promise((res) => { v.onloadeddata = res; setTimeout(res, 4000); });
       thumb = (await shrink(v, THUMB_MAX, 'image/jpeg', 0.8)).blob;
     } catch { /* بلا غلاف */ } finally { URL.revokeObjectURL(url); }
     return { kind: 'video', full: file, thumb, outExt: ext(file.name), thumbExt: 'jpg' };
@@ -277,7 +288,8 @@
   }
   async function saveAll(extra = [], message) {
     // اجلب أحدث نسخة منشورة: إن عُدّلت من جهاز آخر بعد فتح اللوحة، ادمج بدل الكتابة فوقها
-    const [rShop, rSite] = await Promise.all([readJSON(SHOP_PATH), readJSON(CFG_PATH)]);
+    const baseSha = (await gh(`${repoBase()}/git/ref/heads/${CFG.branch}`)).object.sha;
+    const [rShop, rSite] = await Promise.all([readJSON(SHOP_PATH, baseSha), readJSON(CFG_PATH, baseSha)]);
     const remoteShop = canon(cleanOf(rShop)), remoteSite = canon(rSite);
     let merged = false;
     if (remoteShop !== ORIG_SHOP) {
@@ -304,7 +316,7 @@
     }
     const kinds = [...changes].map((c) => c.split(':')[0]);
     const msg = message || summarize(kinds);
-    const sha = await commit(entries, msg, (d, t) => t > 1 && busy(`جارٍ الرفع… ${num(d)}/${num(t)}`));
+    const sha = await commit(entries, msg, (d, t) => t > 1 && busy(`جارٍ الرفع… ${num(d)}/${num(t)}`), baseSha);
     changes.clear();
     if (stagedLogo) { URL.revokeObjectURL(stagedLogo.url); stagedLogo = null; }
     snapshot();
@@ -583,6 +595,12 @@
       toast(!safeName(q.title) ? 'اكتب اسم كل منتج قبل النشر' : 'اختر تصنيف كل منتج قبل النشر', true);
       return;
     }
+    // فيديو بلا صورة غلاف لا يظهر في المتجر: ننبّه بدل أن يُرفع ويختفي بصمت
+    const noCover = queue.findIndex((q) => q.kind === 'video' && !q.thumb);
+    if (noCover > -1) {
+      toast(`تعذّر تجهيز غلاف الفيديو «${queue[noCover].title || 'بلا اسم'}» فلن يظهر في المتجر. أزله وجرّب فيديو MP4 أو صورة بدلًا منه`, true);
+      return;
+    }
     const backup = JSON.parse(JSON.stringify(SHOP));
     const taken = new Set(ITEMS.map((i) => i.path));
     const entries = [], added = [];
@@ -607,7 +625,11 @@
       clearQueue();
       render();
       toast('تم نشر المنتجات');
-    } catch (err) { SHOP = backup; render(); toast('تعذّر النشر: ' + err.message, true); } finally { idle(); }
+    } catch (err) {
+      SHOP = backup; render();
+      renderReview(); openSheet('review');     // ما كتبتِه يبقى: أعيدي الضغط على «نشر» دون اختيار الصور من جديد
+      toast('تعذّر النشر: ' + err.message, true);
+    } finally { idle(); }
   });
 
   /* ---------- محرر المنتج ---------- */
@@ -690,7 +712,12 @@
       refreshCats();
       render();
       toast('تم الحفظ');
-    } catch (err) { SHOP = backup.shop; Object.assign(it, backup.it); render(); toast('تعذّر الحفظ: ' + err.message, true); } finally { idle(); }
+    } catch (err) {
+      changes.delete('p:' + it.title);
+      SHOP = backup.shop; Object.assign(it, backup.it); render(); updateSavebar();
+      openSheet('itemSheet');                  // القيم المكتوبة باقية في النموذج: اضغطي «حفظ» مرة أخرى
+      toast('تعذّر الحفظ: ' + err.message, true);
+    } finally { idle(); }
   });
   $('#isDelete').addEventListener('click', async () => {
     const it = editing;
@@ -777,7 +804,7 @@
   function bulkUpdate() {
     const a = bkAct();
     $('#bkValWrap').hidden = a === 'unsale';
-    $('#bkValLbl').textContent = a === 'set' ? `السعر (${SHOP.currency || 'ر.ي'})` : a === 'adjust' ? 'النسبة ٪ (سالب للتخفيض)' : 'نسبة الخصم ٪';
+    $('#bkValLbl').textContent = a === 'set' ? `السعر (${SHOP.currency || 'ر.ي'})` : a === 'up' ? 'نسبة الرفع ٪' : a === 'down' ? 'نسبة الخفض ٪' : 'نسبة الخصم ٪';
     const t = bulkTargets();
     const priced = t.filter((it) => getP(it).price != null).length;
     const onSale = t.filter((it) => isSale(getP(it))).length;
@@ -791,8 +818,9 @@
   $('#bkApply').addEventListener('click', () => {
     const a = bkAct(), v = toNum($('#bkVal').value), step = +$('#bkRound').value;
     const round = (x) => Math.max(step, Math.round(x / step) * step);
-    if (a !== 'unsale' && (v == null || v === 0 && a !== 'adjust')) { toast('اكتب القيمة أولًا', true); return; }
+    if (a !== 'unsale' && (v == null || v === 0)) { toast('اكتب القيمة أولًا', true); return; }
     if (a === 'sale' && (v <= 0 || v >= 95)) { toast('نسبة الخصم بين ١ و ٩٤', true); return; }
+    if (a === 'down' && v >= 95) { toast('نسبة الخفض أقل من ٩٥', true); return; }
     let n = 0;
     for (const it of bulkTargets()) {
       const p = getP(it);
@@ -806,7 +834,11 @@
           if (np <= 0 || np >= base) continue;
           setP(it, { oldPrice: base, price: np });
         }
-        else { const sign = $('#bkVal').value.trim().startsWith('-') ? -1 : 1; setP(it, { price: round(p.price * (1 + sign * v / 100)), oldPrice: p.oldPrice != null ? round(p.oldPrice * (1 + sign * v / 100)) : null }); }
+        else {
+          // الرفع والخفض يشملان أسعار الكميات حتى يبقى سعر الكمية أقل من سعر القطعة
+          const f = 1 + (a === 'down' ? -1 : 1) * v / 100;
+          setP(it, { price: round(p.price * f), oldPrice: p.oldPrice != null ? round(p.oldPrice * f) : null, bulk: Array.isArray(p.bulk) && p.bulk.length ? p.bulk.map((b) => ({ min: b.min, price: round(b.price * f) })) : null });
+        }
         n++;
       }
     }

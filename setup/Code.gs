@@ -82,7 +82,9 @@ function doPost(e) {
   // كمية واحدة موحّدة لكل سطر: تُستخدم في العرض والحساب معًا
   d.items = d.items.slice(0, 60).map((it) => ({
     key: String(it.key || it.title || ''), title: String(it.title || it.key || ''),
-    q: Math.max(1, Math.min(999, Math.floor(num_(it.q) || 1))), price: num_(it.price), from: !!it.from,
+    q: Math.max(1, Math.min(999, Math.floor(num_(it.q) || 1))),
+    price: it.price == null || it.price === '' ? null : num_(it.price),   // بلا سعر = «السعر عند الطلب» لا صفر
+    from: !!it.from,
   }));
   const check = verify_(d);            // قبل القفل: جلب الأسعار قد يأخذ ثوانٍ
 
@@ -230,12 +232,27 @@ function verify_(d) {
   try {
     const f = fetchShop_(false);
     if (!f.raw) return { ok: true, label: 'تعذّر التحقق الآن (' + f.err + ')' };
-    const shop = JSON.parse(f.raw);
+    let r = check_(d, JSON.parse(f.raw));
+    // نسخة الأسعار المحفوظة قد تكون أقدم من تعديل نُشر للتو: نعيد القراءة مرة قبل أن نحكم بخطأ
+    if (!r.ok && f.source === 'cache') {
+      const g = fetchShop_(true);
+      if (g.raw) r = check_(d, JSON.parse(g.raw));
+    }
+    return r;
+  } catch (err) {
+    return { ok: true, label: 'تعذّر التحقق الآن (' + String(err).slice(0, 60) + ')' };   // لا نوقف الطلب إن تعذّر التحقق
+  }
+}
+
+/** يحسب الطلب من ملف أسعار المتجر */
+function check_(d, shop) {
     const P = shop.products || {};
     let sub = 0, unpriced = false, unknown = 0, mismatch = 0;
     const units = [], names = [];
     d.items.forEach((it) => {
       const p = P[it.key];
+      // قطعة لم يُحدَّد لها سعر ولا إعدادات بعد: يعرضها المتجر «السعر عند الطلب»
+      if (!p && it.price == null) { unpriced = true; units.push(null); names.push(it.title); return; }
       if (!p) { unknown++; units.push(it.price); names.push(it.title); return; }
       const sameName = it.title.indexOf(it.key) === 0;     // العنوان = الاسم + (مدة التجهيز)
       if (!sameName) mismatch++;
@@ -268,9 +285,6 @@ function verify_(d) {
       : sameTotal ? (unpriced ? '✓ مطابق (عدا قطع سعرها عند الطلب)' : '✓ مطابق')
       : '⚠ المبلغ الصحيح: ' + fmt_(total) + (unpriced ? ' + قطع سعرها عند الطلب' : '');
     return { ok, total, label, units, names };
-  } catch (err) {
-    return { ok: true, label: 'تعذّر التحقق الآن (' + String(err).slice(0, 60) + ')' };   // لا نوقف الطلب إن تعذّر التحقق
-  }
 }
 
 /** يقرأ ملف أسعار المتجر: من الموقع، ثم من GitHub إن رُفض الطلب. يُحفظ ٥ دقائق */
