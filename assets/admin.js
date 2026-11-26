@@ -532,13 +532,14 @@
   function renderReview() {
     $('#revList').innerHTML = queue.map((q, i) => {
       if (!q.preview) q.preview = URL.createObjectURL(q.thumb || q.full);
-      const mb = (q.full.size / 1048576).toFixed(1);
+      // الصور بعد الضغط غالبًا أقل من ١ م.ب: نعرضها بالكيلوبايت بدل «0.0 م.ب»
+      const mb = q.full.size < 1048576 ? `${Math.max(1, Math.round(q.full.size / 1024))} ك.ب` : `${(q.full.size / 1048576).toFixed(1)} م.ب`;
       return `<div class="rev-item" data-i="${i}"><img src="${q.preview}" alt="">
         <div class="rev-f">
           <label class="fld wide"><span>اسم المنتج</span><input type="text" data-f="title" value="${esc(q.title)}" placeholder="مثال: سوار اللؤلؤ الوردي"></label>
           <label class="fld"><span>التصنيف</span><select data-f="category">${catOptions(q.category)}</select></label>
           <label class="fld"><span>السعر <small>(اختياري)</small></span><span class="inp money"><input type="text" inputmode="numeric" data-f="price" value="${esc(q.price)}" placeholder="عند الطلب"><em class="cur">${esc(SHOP.currency || 'ر.ي')}</em></span></label>
-          <div class="rev-meta"><span>${q.kind === 'video' ? 'فيديو' : 'صورة'} · ${mb} م.ب</span><button class="link-btn" data-drop="${i}">إزالة</button></div>
+          <div class="rev-meta"><span>${q.kind === 'video' ? 'فيديو' : 'صورة'} · ${mb}</span><button class="link-btn" data-drop="${i}">إزالة</button></div>
         </div></div>`;
     }).join('');
     $('#revPublish').textContent = queue.length === 1 ? 'نشر المنتج' : `نشر ${plural(queue.length, 'منتج', 'منتجات', 'منتجًا')}`;
